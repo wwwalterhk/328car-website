@@ -31,10 +31,16 @@ type NormalizedListing = {
 	summary: string | null;
 	remark: string | null;
 	photos: string | null;
-	photosArray: string[];
+	photosArray: PhotoRecord[];
 	last_update_datetime: string | null;
 	vehicle_type: string | null;
 	sold: number;
+};
+
+type PhotoRecord = {
+	orig: string;
+	r2: string | null;
+	r2_square: string | null;
 };
 
 const INSERT_SQL = `
@@ -88,7 +94,17 @@ WHERE model_sts = 0
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 1000;
 const SELECT_LISTING_PK_SQL = `SELECT listing_pk FROM car_listings WHERE site = ? AND id = ?`;
-const INSERT_PHOTO_SQL = `INSERT OR IGNORE INTO car_listings_photo (listing_pk, url) VALUES (?, ?)`;
+const UPSERT_PHOTO_SQL = `
+INSERT INTO car_listings_photo (listing_pk, url, url_r2, url_r2_square)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(listing_pk, url) DO UPDATE SET
+  url_r2 = excluded.url_r2,
+  url_r2_square = excluded.url_r2_square
+`;
+const DELETE_PHOTOS_NOT_IN_SQL = (placeholders: number) =>
+	`DELETE FROM car_listings_photo WHERE listing_pk = ? AND url NOT IN (${Array.from({ length: placeholders })
+		.map(() => "?")
+		.join(", ")})`;
 const BRAND_LOOKUP_SQL = `
 SELECT slug FROM brands
 WHERE slug = ?
@@ -128,7 +144,7 @@ type ListingRow = {
 	summary: string | null;
 	remark: string | null;
 	photos: string | null;
-	photosArray: string[];
+	photosArray: PhotoRecord[];
 	last_update_datetime: string | null;
 	vehicle_type: string | null;
 	sold: number;
@@ -303,7 +319,7 @@ function normalizeListing(item: IncomingListing): { listing?: NormalizedListing;
 	}
 
 	const photos = Array.isArray(item.photos)
-		? item.photos.map((photo) => toStringOrNull(photo)).filter((v): v is string => Boolean(v))
+		? normalizePhotosArray(item.photos)
 		: [];
 
 	return {
@@ -423,13 +439,28 @@ async function syncPhotos(db: D1Database, listings: NormalizedListing[]) {
 
 		if (!listingPk) continue;
 
-		for (const url of listing.photosArray) {
+		const incoming = listing.photosArray;
+		for (const photo of incoming) {
 			try {
-				const res = await db.prepare(INSERT_PHOTO_SQL).bind(listingPk, url).run();
+				const res = await db
+					.prepare(UPSERT_PHOTO_SQL)
+					.bind(listingPk, photo.orig, photo.r2, photo.r2_square)
+					.run();
 				inserted += res.meta.changes ?? 0;
 			} catch (error) {
-				console.warn("Failed to insert photo", { listingPk, url, error });
+				console.warn("Failed to upsert photo", { listingPk, photo, error });
 			}
+		}
+
+		// Remove stale photos not present in the incoming payload.
+		try {
+			const deleteSql = DELETE_PHOTOS_NOT_IN_SQL(incoming.length);
+			await db
+				.prepare(deleteSql)
+				.bind(listingPk, ...incoming.map((p) => p.orig))
+				.run();
+		} catch (error) {
+			console.warn("Failed to delete stale photos", { listingPk, error });
 		}
 	}
 
@@ -478,6 +509,30 @@ async function lookupBrandSlug(db: D1Database, brandValue: string): Promise<stri
 	return slug ?? null;
 }
 
+function normalizePhotosArray(raw: unknown[]): PhotoRecord[] {
+	const normalized: PhotoRecord[] = [];
+
+	for (const entry of raw) {
+		if (typeof entry === "string") {
+			const url = entry.trim();
+			if (url) normalized.push({ orig: url, r2: null, r2_square: null });
+			continue;
+		}
+
+		if (entry && typeof entry === "object") {
+			const orig = toStringOrNull((entry as { orig?: unknown }).orig)?.trim();
+			const r2 = toStringOrNull((entry as { r2?: unknown }).r2)?.trim() ?? null;
+			const r2Square = toStringOrNull((entry as { r2_square?: unknown }).r2_square)?.trim() ?? null;
+			if (orig) {
+				normalized.push({ orig, r2, r2_square: r2Square });
+			}
+			continue;
+		}
+	}
+
+	return normalized;
+}
+
 function clampLimit(rawLimit: string | null): number {
 	if (!rawLimit) return DEFAULT_LIMIT;
 	const parsed = Number(rawLimit);
@@ -486,12 +541,23 @@ function clampLimit(rawLimit: string | null): number {
 }
 
 function deserializeListingRow(row: ListingRow) {
-	let photos: string[] | null = null;
+	let photos: PhotoRecord[] | null = null;
 	if (row.photos) {
 		try {
 			const parsed = JSON.parse(row.photos);
 			if (Array.isArray(parsed)) {
-				photos = parsed.filter((item) => typeof item === "string");
+				photos = parsed
+					.map((entry) => {
+						if (typeof entry === "string") return { orig: entry, r2: null, r2_square: null };
+						if (entry && typeof entry === "object") {
+							const orig = toStringOrNull((entry as { orig?: unknown }).orig);
+							const r2 = toStringOrNull((entry as { r2?: unknown }).r2);
+							const r2Square = toStringOrNull((entry as { r2_square?: unknown }).r2_square);
+							if (orig) return { orig, r2: r2 ?? null, r2_square: r2Square ?? null };
+						}
+						return null;
+					})
+					.filter((v): v is PhotoRecord => Boolean(v));
 			}
 		} catch (error) {
 			console.warn("Failed to parse photos JSON", { error });

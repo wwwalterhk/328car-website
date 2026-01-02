@@ -15,6 +15,13 @@
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "328car-cdn",
+			"preview_bucket_name": "328car-cdn"
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",

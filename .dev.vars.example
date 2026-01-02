@@ -1,0 +1,8 @@
+# Local dev environment variables (used by `wrangler dev`)
+NEXTJS_ENV=development
+# OpenAI API key for batch processing
+#OPENAI_API_KEY=sk-xxxx
+# Optional: override base URL (e.g., for gateway)
+OPENAI_BASE_URL=https://api.openai.com/v1
+# Optional: default batch model id
+OPENAI_BATCH_MODEL=GPT-5 mini
