@@ -478,7 +478,7 @@ function safeJsonParse<T>(text: string): T | null {
 }
 
 function buildPromptTemplate() {
-  return `return the model info in english of the car in json format and check the photos :
+  return `return the model info in english of the car in json format and inspect the input_image for my car photos:
 [return format]:
 {
 id: "my input id",
@@ -526,11 +526,12 @@ function buildRequestPayload(promptTemplate: string, listing: Listing, model: st
     body_type: listing.body_type,
     summary: listing.summary,
     remark: listing.remark,
-    photos: listing.photos,
     vehicle_type: listing.vehicle_type,
   };
 
   const userMessage = `${promptTemplate}\n${JSON.stringify(data, null, 2)}`;
+  const photos = Array.isArray(listing.photos) ? listing.photos.filter((url) => typeof url === "string") : [];
+  const content = [{ type: "input_text", text: userMessage }, ...photos.map((url) => ({ type: "input_image", image_url: url }))];
 
   return {
     custom_id: `${listing.site}-${listing.id}`,
@@ -540,7 +541,12 @@ function buildRequestPayload(promptTemplate: string, listing: Listing, model: st
       model,
       // Prefer Responses API "instructions" + "input" for maximum compatibility. :contentReference[oaicite:7]{index=7}
       instructions: "You are a vehicle data normalizer. Return only JSON.",
-      input: userMessage,
+      input: [
+        {
+          role: "user",
+          content,
+        },
+      ],
 
       // JSON mode / structured text formatting for Responses API uses text.format. :contentReference[oaicite:8]{index=8}
       text: { format: { type: "json_object" } },

@@ -361,7 +361,16 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 	if (!brandSlug) return;
 
 	const resolvedModelName = parsed.model_name;
-	const modelSlug = normalizeSlug(resolvedModelName);
+	const modelSlug = normalizeSlug(
+		buildModelSlugInput({
+			modelName: resolvedModelName,
+			manuModelCode: parsed.manu_model_code,
+			power: parsed.power,
+			powerKw: parsed.power_kw,
+			engineCc: parsed.engine_cc,
+			turbo: parsed.turbo,
+		})
+	);
 
 	const statements = [
 		db
@@ -609,4 +618,22 @@ function normalizeSlug(value: string | null): string | null {
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/(^-|-$)/g, "");
 	return slug || null;
+}
+
+function buildModelSlugInput(opts: {
+	modelName: string | null;
+	manuModelCode: string | null;
+	power: string | null;
+	powerKw: string | null;
+	engineCc: string | null;
+	turbo: string | null;
+}): string | null {
+	if (!opts.modelName) return null;
+	const isElectric = opts.power?.toLowerCase() === "electric";
+	const parts = isElectric
+		? [opts.modelName, opts.manuModelCode, opts.manuModelCode, opts.powerKw]
+		: [opts.modelName, opts.manuModelCode, opts.engineCc, opts.turbo];
+	return parts
+		.filter((part) => typeof part === "string" && part.trim())
+		.join("-");
 }
