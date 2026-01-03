@@ -15,7 +15,7 @@ async function loadBrands(): Promise<BrandRow[]> {
 	if (!db) return [];
 
 	const result = await db
-		.prepare("SELECT slug, name_en, name_zh_tw, name_zh_hk FROM brands ORDER BY slug ASC")
+		.prepare("SELECT slug, name_en, name_zh_tw, name_zh_hk FROM brands WHERE sts = 1 ORDER BY slug ASC")
 		.all<BrandRow>();
 
 	return result.results ?? [];
@@ -34,13 +34,14 @@ export default async function Home() {
 	const brands = await loadBrands();
 
 	return (
-		<div
-			className="min-h-screen bg-[#f7f2e8] px-6 py-12 text-slate-900 sm:px-10 lg:px-16"
-			style={{
-				backgroundImage:
-					"radial-gradient(circle at top left, rgba(254, 237, 209, 0.9), rgba(247, 242, 232, 0.2) 55%), radial-gradient(circle at 70% 10%, rgba(200, 223, 240, 0.45), rgba(247, 242, 232, 0) 45%)",
-			}}
-		>
+		<div className="relative min-h-screen px-6 py-12 text-slate-900 sm:px-10 lg:px-16">
+			<div
+				className="pointer-events-none fixed inset-0 -z-10 bg-[#f7f2e8]"
+				style={{
+					backgroundImage:
+						"radial-gradient(circle at top left, rgba(254, 237, 209, 0.9), rgba(247, 242, 232, 0.2) 55%), radial-gradient(circle at 70% 10%, rgba(200, 223, 240, 0.45), rgba(247, 242, 232, 0) 45%)",
+				}}
+			/>
 			<main className="mx-auto max-w-6xl">
 				<section className="flex flex-col gap-6">
 					<div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-900/10 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-700">
@@ -48,11 +49,11 @@ export default async function Home() {
 					</div>
 					<div className="space-y-3">
 						<h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-							Explore the catalog by marque
+							Discover cars, trims, and real market details
 						</h1>
 						<p className="max-w-2xl text-sm text-slate-600 sm:text-base">
-							Every logo here is pulled from the brands table. We use the slug to locate its
-							image asset and keep the list always in sync.
+							Start with a brand to see models, specs, and listing insights curated for the
+							Hong Kong market.
 						</p>
 					</div>
 					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-500">

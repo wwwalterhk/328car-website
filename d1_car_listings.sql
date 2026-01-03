@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS car_listings (
   last_update_datetime TEXT,
   vehicle_type TEXT,
   sold INTEGER, -- 0/1
+  sts INTEGER DEFAULT 1, -- 0=disabled/1=enabled
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (site, id)
 );
@@ -46,6 +47,8 @@ CREATE TABLE IF NOT EXISTS brands (
   name_en TEXT,
   name_zh_tw TEXT,
   name_zh_hk TEXT,
+  sts TEXT, -- 0-disabled, 1=enabled
+  electric TEXT, -- 0-no, 1=yes
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
