@@ -46,7 +46,6 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         b.name_zh_hk,
         m.model_name,
         b.slug AS brand_slug,
-        m.model_slug,
         m.model_name_slug
       FROM car_listings c
       INNER JOIN brands b ON c.brand_slug = b.slug
@@ -55,13 +54,8 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         c.sts = 1
         AND c.model_sts = 1
         AND c.last_update_datetime > datetime('now', '-1 year')
+  		AND m.power != 'electric'
       GROUP BY
-        c.model_pk,
-        b.name_en,
-        b.name_zh_hk,
-        m.model_name,
-        b.slug,
-        m.model_slug,
         m.model_name_slug
       ORDER BY listing_count DESC`
 		)
@@ -124,13 +118,14 @@ export default async function Home() {
 					</div>
 				</section>
 
-				<section className="mt-10 grid gap-4 md:grid-cols-3">
+				<section className="mt-10 grid gap-4 md:grid-cols-3 traditional-car-list">
 					{models.map((model) => {
 						const modelLabel = model.model_name || "Unknown model";
 						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
 						const nameSlug = model.model_name_slug || toSlug(model.model_name);
 						const modelSlug = model.model_slug || toSlug(model.model_name);
-						const href = `/hk/zh/${model.brand_slug}/${nameSlug ?? ""}/${modelSlug ?? ""}`;
+						const modelNameSlug = model.model_name_slug || toSlug(model.model_name_slug);
+						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
 
 						return (
 							<a

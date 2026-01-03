@@ -84,6 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_car_listings_photo_listing
 -- Model catalogue (normalized plus raw JSON blob)
 CREATE TABLE IF NOT EXISTS models (
   model_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  merged_to_model_pk INTEGER,
   brand TEXT,
   brand_slug TEXT NOT NULL,
   model_slug TEXT,
@@ -268,3 +269,82 @@ INSERT OR IGNORE INTO brands (slug, name_en, name_zh_tw, name_zh_hk) VALUES
   ('scania', 'Scania', 'SCANIA', 'SCANIA'),
   ('sinotruk', 'Sinotruk', '中國重汽', '中國重汽'),
   ('ssangyong', 'SsangYong', '雙龍', '雙龍');
+
+
+
+-- Core users
+CREATE TABLE IF NOT EXISTS users (
+  user_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  avatar_url TEXT,
+  phone TEXT,
+  locale TEXT DEFAULT 'zh-hk',
+  role TEXT DEFAULT 'user', -- user, dealer, admin
+  status TEXT DEFAULT 'active', -- active, disabled
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- OAuth accounts (Google, etc.)
+CREATE TABLE IF NOT EXISTS user_accounts (
+  account_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_pk INTEGER NOT NULL,
+  provider TEXT NOT NULL, -- google, apple, etc.
+  provider_user_id TEXT NOT NULL,
+  access_token TEXT,
+  refresh_token TEXT,
+  expires_at INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (provider, provider_user_id),
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk)
+);
+
+-- Sessions (if you want DB-backed sessions)
+CREATE TABLE IF NOT EXISTS user_sessions (
+  session_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_pk INTEGER NOT NULL,
+  session_token TEXT NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk)
+);
+
+-- Favorites / watchlist
+CREATE TABLE IF NOT EXISTS user_favorites (
+  favorite_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_pk INTEGER NOT NULL,
+  listing_pk INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_pk, listing_pk),
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk),
+  FOREIGN KEY (listing_pk) REFERENCES car_listings(listing_pk)
+);
+
+-- Saved searches / alerts
+CREATE TABLE IF NOT EXISTS user_saved_searches (
+  search_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_pk INTEGER NOT NULL,
+  name TEXT,
+  query_json TEXT NOT NULL, -- filters as JSON
+  notify INTEGER DEFAULT 0, -- 0/1
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk)
+);
+
+-- Lead / inquiry messages
+CREATE TABLE IF NOT EXISTS user_inquiries (
+  inquiry_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_pk INTEGER,
+  listing_pk INTEGER NOT NULL,
+  message TEXT,
+  status TEXT DEFAULT 'new', -- new, replied, closed
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk),
+  FOREIGN KEY (listing_pk) REFERENCES car_listings(listing_pk)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites(user_pk);
+CREATE INDEX IF NOT EXISTS idx_user_inquiries_listing ON user_inquiries(listing_pk);
+
+
