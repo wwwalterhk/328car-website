@@ -19,6 +19,8 @@ type ModelRow = {
 	brand_slug: string;
 	model_slug: string | null;
 	model_name_slug: string | null;
+	min_year: number | null;
+	max_year: number | null;
 };
 
 async function loadBrands(): Promise<BrandRow[]> {
@@ -46,7 +48,9 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         b.name_zh_hk,
         m.model_name,
         b.slug AS brand_slug,
-        m.model_name_slug
+        m.model_name_slug,
+        MIN(c.year) AS min_year,
+        MAX(c.year) AS max_year
       FROM car_listings c
       INNER JOIN brands b ON c.brand_slug = b.slug
       INNER JOIN models m ON c.model_pk = m.model_pk
@@ -56,7 +60,75 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         AND c.last_update_datetime > datetime('now', '-1 year')
   		AND m.power != 'electric'
       GROUP BY
-        m.model_name_slug
+        m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
+      ORDER BY listing_count DESC`
+	)
+	.all<ModelRow>();
+
+	return result.results ?? [];
+}
+
+async function loadElectricModelsSummary(): Promise<ModelRow[]> {
+	const { env } = await getCloudflareContext({ async: true });
+	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
+	if (!db) return [];
+
+	const result = await db
+		.prepare(
+			`SELECT
+        COUNT(1) AS listing_count,
+        b.name_en,
+        b.name_zh_hk,
+        m.model_name,
+        b.slug AS brand_slug,
+        m.model_name_slug,
+        MIN(c.year) AS min_year,
+        MAX(c.year) AS max_year
+      FROM car_listings c
+      INNER JOIN brands b ON c.brand_slug = b.slug
+      INNER JOIN models m ON c.model_pk = m.model_pk
+      WHERE
+        c.sts = 1
+        AND c.model_sts = 1
+        AND c.last_update_datetime > datetime('now', '-1 year')
+        AND m.power = 'electric'
+      GROUP BY
+        m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
+      ORDER BY listing_count DESC`
+		)
+		.all<ModelRow>();
+
+	const models = result.results ?? [];
+	return models;
+}
+
+async function loadClassicModelsSummary(): Promise<ModelRow[]> {
+	const { env } = await getCloudflareContext({ async: true });
+	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
+	if (!db) return [];
+
+	const result = await db
+		.prepare(
+			`SELECT
+        COUNT(1) AS listing_count,
+        b.name_en,
+        b.name_zh_hk,
+        m.model_name,
+        b.slug AS brand_slug,
+        m.model_name_slug,
+        MIN(c.year) AS min_year,
+        MAX(c.year) AS max_year
+      FROM car_listings c
+      INNER JOIN brands b ON c.brand_slug = b.slug
+      INNER JOIN models m ON c.model_pk = m.model_pk
+      WHERE
+        c.sts = 1
+        AND c.model_sts = 1
+        AND c.last_update_datetime > datetime('now', '-1 year')
+        AND c.price > 300000
+        AND c.year < CAST(strftime('%Y', 'now', '-30 years') AS INTEGER)
+      GROUP BY
+        m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
       ORDER BY listing_count DESC`
 		)
 		.all<ModelRow>();
@@ -84,7 +156,13 @@ function toSlug(value: string | null): string | null {
 }
 
 export default async function Home() {
-	const [models, brands] = await Promise.all([loadModelsSummary(), loadBrands()]);
+	const [electricModels, traditionalModels, classicModels, brands] = await Promise.all([
+		loadElectricModelsSummary(),
+		loadModelsSummary(),
+		loadClassicModelsSummary(),
+		loadBrands(),
+	]);
+	const totalModels = electricModels.length + traditionalModels.length + classicModels.length;
 
 	return (
 		<div className="relative min-h-screen px-6 py-12 text-slate-900 sm:px-10 lg:px-16">
@@ -114,18 +192,29 @@ export default async function Home() {
 					</div>
 					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-500">
 						<span className="h-[1px] w-10 bg-slate-300" aria-hidden />
-						{models.length} models
+						{totalModels} models
 					</div>
 				</section>
 
-				<section className="mt-10 grid gap-4 md:grid-cols-3 traditional-car-list">
-					{models.map((model) => {
+				<section className="mt-10 space-y-4">
+					<div className="space-y-1">
+						<h2 className="text-xl font-semibold text-slate-900">Electric models in stock</h2>
+						<p className="text-sm text-slate-600">
+							EV and plug-in models with active listings in the past 12 months.
+						</p>
+					</div>
+					<div className="grid gap-4 md:grid-cols-3 electric-car-list">
+					{electricModels.map((model) => {
 						const modelLabel = model.model_name || "Unknown model";
 						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
-						const nameSlug = model.model_name_slug || toSlug(model.model_name);
-						const modelSlug = model.model_slug || toSlug(model.model_name);
-						const modelNameSlug = model.model_name_slug || toSlug(model.model_name_slug);
+						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
 						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
+						const yearText =
+							model.min_year && model.max_year
+								? model.min_year === model.max_year
+									? `${model.min_year}`
+									: `${model.min_year}–${model.max_year}`
+								: "Years N/A";
 
 						return (
 							<a
@@ -149,7 +238,9 @@ export default async function Home() {
 											{brandLabel}
 										</div>
 										<div className="text-lg font-semibold text-slate-900">{modelLabel}</div>
-										<div className="text-xs text-slate-500">{model.brand_slug}</div>
+										<div className="text-xs text-slate-500">
+											{model.brand_slug} · {yearText}
+										</div>
 									</div>
 								</div>
 								<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow">
@@ -158,11 +249,136 @@ export default async function Home() {
 							</a>
 						);
 					})}
+					</div>
 				</section>
 
-				{models.length === 0 ? (
+				{electricModels.length === 0 ? (
 					<p className="mt-6 text-sm text-slate-500">
 						No active listings found. Check your D1 data or update schedule.
+					</p>
+				) : null}
+
+				<section className="mt-16 space-y-4">
+					<div className="space-y-1">
+						<h2 className="text-xl font-semibold text-slate-900">Traditional powertrain models</h2>
+						<p className="text-sm text-slate-600">
+							Petrol, diesel, and non-EV models with recent listings.
+						</p>
+					</div>
+					<div className="grid gap-4 md:grid-cols-3 traditional-car-list">
+					{traditionalModels.map((model) => {
+						const modelLabel = model.model_name || "Unknown model";
+						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
+						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
+						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
+						const yearText =
+							model.min_year && model.max_year
+								? model.min_year === model.max_year
+									? `${model.min_year}`
+									: `${model.min_year}–${model.max_year}`
+								: "Years N/A";
+
+						return (
+							<a
+								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
+								href={href}
+								className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile"
+							>
+								<div className="flex min-w-0 items-center gap-3">
+									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
+										<Image
+											src={getBrandImage(model.brand_slug)}
+											alt={`${brandLabel} logo`}
+											width={32}
+											height={32}
+											className="h-8 w-8 object-contain"
+											priority={false}
+										/>
+									</div>
+									<div className="min-w-0">
+										<div className="text-xs uppercase tracking-[0.2em] text-slate-400">
+											{brandLabel}
+										</div>
+										<div className="text-lg font-semibold text-slate-900">{modelLabel}</div>
+										<div className="text-xs text-slate-500">
+											{model.brand_slug} · {yearText}
+										</div>
+									</div>
+								</div>
+								<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow">
+									{model.listing_count}
+								</div>
+							</a>
+						);
+					})}
+					</div>
+				</section>
+
+				{traditionalModels.length === 0 ? (
+					<p className="mt-6 text-sm text-slate-500">
+						No active traditional listings found. Check your D1 data or update schedule.
+					</p>
+				) : null}
+
+				<section className="mt-16 space-y-4">
+					<div className="space-y-1">
+						<h2 className="text-xl font-semibold text-slate-900">Classic cars</h2>
+						<p className="text-sm text-slate-600">
+							Listings older than 30 years with prices above 300,000.
+						</p>
+					</div>
+					<div className="grid gap-4 md:grid-cols-3 classic-car-list">
+					{classicModels.map((model) => {
+						const modelLabel = model.model_name || "Unknown model";
+						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
+						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
+						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
+						const yearText =
+							model.min_year && model.max_year
+								? model.min_year === model.max_year
+									? `${model.min_year}`
+									: `${model.min_year}–${model.max_year}`
+								: "Years N/A";
+
+						return (
+							<a
+								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
+								href={href}
+								className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile"
+							>
+								<div className="flex min-w-0 items-center gap-3">
+									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
+										<Image
+											src={getBrandImage(model.brand_slug)}
+											alt={`${brandLabel} logo`}
+											width={32}
+											height={32}
+											className="h-8 w-8 object-contain"
+											priority={false}
+										/>
+									</div>
+									<div className="min-w-0">
+										<div className="text-xs uppercase tracking-[0.2em] text-slate-400">
+											{brandLabel}
+										</div>
+										<div className="text-lg font-semibold text-slate-900">{modelLabel}</div>
+										<div className="text-xs text-slate-500">
+											{model.brand_slug} · {yearText}
+										</div>
+									</div>
+								</div>
+								<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow">
+									{model.listing_count}
+								</div>
+							</a>
+						);
+					})}
+					</div>
+				</section>
+
+				{classicModels.length === 0 ? (
+					<p className="mt-6 text-sm text-slate-500">
+						No classic listings found. Check your D1 data or update schedule.
 					</p>
 				) : null}
 
@@ -190,9 +406,10 @@ export default async function Home() {
 						const title = getBrandTitle(brand);
 						const locale = brand.name_zh_tw || brand.name_zh_hk;
 						return (
-							<div
+							<a
 								key={brand.slug}
-								className="group flex items-center gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)]"
+								href={`/hk/zh/${brand.slug}`}
+								className="group flex items-center gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] brand-tile"
 							>
 								<div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-900/5">
 									<Image
@@ -211,7 +428,7 @@ export default async function Home() {
 									</div>
 									{locale ? <div className="text-xs text-slate-500">{locale}</div> : null}
 								</div>
-							</div>
+							</a>
 						);
 					})}
 				</section>

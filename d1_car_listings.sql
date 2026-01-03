@@ -114,6 +114,9 @@ CREATE TABLE IF NOT EXISTS models (
 
 CREATE INDEX IF NOT EXISTS idx_models_brand_code
   ON models (brand_slug, manu_model_code);
+  
+CREATE INDEX IF NOT EXISTS idx_models_model_name_slug ON models (model_name_slug);
+
 
 -- Model info content (per locale)
 CREATE TABLE IF NOT EXISTS models_info (
