@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
 		remotePatterns: [
 			{ protocol: "https", hostname: "lh3.googleusercontent.com" },
 			{ protocol: "https", hostname: "*.googleusercontent.com" },
+			{ protocol: "https", hostname: "cdn.328car.com" },
+			{ protocol: "https", hostname: "cdn2.328car.com" },
+			{ protocol: "https", hostname: "cdn3.328car.com" },
+			{ protocol: "https", hostname: "*.328car.com" },
 		],
 	},
 };

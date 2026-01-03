@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import Image from "next/image";
 import AuthStatus from "@/app/components/auth-status";
+import BrandLogo from "@/app/components/brand-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -136,11 +136,6 @@ async function loadClassicModelsSummary(): Promise<ModelRow[]> {
 	return result.results ?? [];
 }
 
-function getBrandImage(slug: string): string {
-	const normalized = slug.replace(/-/g, "_");
-	return `/brands/${normalized}.png`;
-}
-
 function getBrandTitle(brand: BrandRow): string {
 	return brand.name_en || brand.name_zh_tw || brand.name_zh_hk || brand.slug;
 }
@@ -167,10 +162,10 @@ export default async function Home() {
 	return (
 		<div className="relative min-h-screen px-6 py-12 text-slate-900 sm:px-10 lg:px-16">
 			<div
-				className="pointer-events-none fixed inset-0 -z-10 bg-[#f7f2e8]"
+				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
-					backgroundImage:
-						"radial-gradient(circle at top left, rgba(254, 237, 209, 0.9), rgba(247, 242, 232, 0.2) 55%), radial-gradient(circle at 70% 10%, rgba(200, 223, 240, 0.45), rgba(247, 242, 232, 0) 45%)",
+					backgroundColor: "var(--background)",
+					backgroundImage: "var(--page-bg-gradient)",
 				}}
 			/>
 			<main className="mx-auto max-w-6xl">
@@ -220,17 +215,15 @@ export default async function Home() {
 							<a
 								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
 								href={href}
-								className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile"
+								className="group flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile theme-surface"
 							>
 								<div className="flex min-w-0 items-center gap-3">
 									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
-										<Image
-											src={getBrandImage(model.brand_slug)}
+										<BrandLogo
+											slug={model.brand_slug}
 											alt={`${brandLabel} logo`}
-											width={32}
-											height={32}
+											size={32}
 											className="h-8 w-8 object-contain"
-											priority={false}
 										/>
 									</div>
 									<div className="min-w-0">
@@ -243,7 +236,14 @@ export default async function Home() {
 										</div>
 									</div>
 								</div>
-								<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow">
+								<div
+									className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold shadow count-badge"
+									style={{
+										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+										color: "var(--background)",
+										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+									}}
+								>
 									{model.listing_count}
 								</div>
 							</a>
@@ -282,17 +282,15 @@ export default async function Home() {
 							<a
 								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
 								href={href}
-								className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile"
+								className="group flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile theme-surface"
 							>
 								<div className="flex min-w-0 items-center gap-3">
 									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
-										<Image
-											src={getBrandImage(model.brand_slug)}
+										<BrandLogo
+											slug={model.brand_slug}
 											alt={`${brandLabel} logo`}
-											width={32}
-											height={32}
+											size={32}
 											className="h-8 w-8 object-contain"
-											priority={false}
 										/>
 									</div>
 									<div className="min-w-0">
@@ -305,7 +303,14 @@ export default async function Home() {
 										</div>
 									</div>
 								</div>
-								<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow">
+								<div
+									className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold shadow count-badge"
+									style={{
+										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+										color: "var(--background)",
+										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+									}}
+								>
 									{model.listing_count}
 								</div>
 							</a>
@@ -344,17 +349,15 @@ export default async function Home() {
 							<a
 								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
 								href={href}
-								className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile"
+								className="group flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile theme-surface"
 							>
 								<div className="flex min-w-0 items-center gap-3">
 									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
-										<Image
-											src={getBrandImage(model.brand_slug)}
+										<BrandLogo
+											slug={model.brand_slug}
 											alt={`${brandLabel} logo`}
-											width={32}
-											height={32}
+											size={32}
 											className="h-8 w-8 object-contain"
-											priority={false}
 										/>
 									</div>
 									<div className="min-w-0">
@@ -367,7 +370,14 @@ export default async function Home() {
 										</div>
 									</div>
 								</div>
-								<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow">
+								<div
+									className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold shadow count-badge"
+									style={{
+										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+										color: "var(--background)",
+										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+									}}
+								>
 									{model.listing_count}
 								</div>
 							</a>
@@ -409,16 +419,14 @@ export default async function Home() {
 							<a
 								key={brand.slug}
 								href={`/hk/zh/${brand.slug}`}
-								className="group flex items-center gap-4 rounded-2xl border border-slate-900/10 bg-white/80 p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] brand-tile"
+								className="group flex items-center gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] brand-tile theme-surface"
 							>
 								<div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-900/5">
-									<Image
-										src={getBrandImage(brand.slug)}
+									<BrandLogo
+										slug={brand.slug}
 										alt={`${title} logo`}
-										width={40}
-										height={40}
+										size={40}
 										className="h-10 w-10 object-contain"
-										priority={false}
 									/>
 								</div>
 								<div className="min-w-0">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Providers from "./providers";
 import "./globals.css";
+import ThemeToggle from "./components/theme-toggle";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -29,7 +30,10 @@ export default function RootLayout({
 				<link rel="icon" href="/favicon.svg" type="image/svg+xml"></link>
 			</head>
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-				<Providers>{children}</Providers>
+				<Providers>
+					{children}
+					<ThemeToggle />
+				</Providers>
 			</body>
 		</html>
 	);

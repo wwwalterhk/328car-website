@@ -122,7 +122,14 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 		"Model";
 
 	return (
-		<div className="min-h-screen bg-white px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+		<div className="relative min-h-screen px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+			<div
+				className="pointer-events-none fixed inset-0 -z-10"
+				style={{
+					backgroundColor: "var(--background)",
+					backgroundImage: "var(--page-bg-gradient)",
+				}}
+			/>
 			<div className="mx-auto max-w-5xl space-y-6">
 				<div className="space-y-2">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-500">{brandSlug}</div>
@@ -153,7 +160,7 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 						return (
 							<div
 								key={row.model_slug ?? row.model_name_slug ?? yearText}
-								className="flex flex-col gap-3 rounded-2xl border border-slate-900/10 bg-white p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)]"
+								className="flex flex-col gap-3 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] theme-surface"
 							>
 								<div className="flex items-center justify-between gap-3">
 									<div className="min-w-0">
@@ -164,7 +171,14 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 											{row.model_name || row.model_name_slug || "Variant"}
 										</div>
 									</div>
-									<div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+									<div
+										className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold shadow"
+										style={{
+											backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+											color: "var(--background)",
+											border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+										}}
+									>
 										{row.listing_count}
 									</div>
 								</div>
@@ -205,10 +219,17 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 												<Link
 													key={`${row.model_slug ?? row.model_name_slug}-${yr ?? idx}`}
 													href={href}
-													className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 px-3 py-1 text-xs font-semibold text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow"
+													className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold text-slate-800 transition hover:-translate-y-0.5 hover:shadow theme-surface"
 												>
 													<span>{yr ?? "Unknown year"}</span>
-													<span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">
+													<span
+														className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+														style={{
+															backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+															color: "var(--background)",
+															border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+														}}
+													>
 														{y.listing_count}
 													</span>
 												</Link>

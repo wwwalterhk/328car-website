@@ -52,6 +52,18 @@ CREATE TABLE IF NOT EXISTS brands (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS brands_item (
+  item_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_slug TEXT NOT NULL,
+  locale TEXT NOT NULL,
+  item TEXT,
+  item_key TEXT,
+  content TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (brand_slug, locale, item)
+);
+
+
 CREATE INDEX IF NOT EXISTS idx_car_listings_brand_model_year
   ON car_listings (brand, model, year);
 
@@ -114,28 +126,20 @@ CREATE TABLE IF NOT EXISTS models (
 
 CREATE INDEX IF NOT EXISTS idx_models_brand_code
   ON models (brand_slug, manu_model_code);
-  
+
 CREATE INDEX IF NOT EXISTS idx_models_model_name_slug ON models (model_name_slug);
 
 
 -- Model info content (per locale)
-CREATE TABLE IF NOT EXISTS models_info (
-  info_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS models_item (
+  item_pk INTEGER PRIMARY KEY AUTOINCREMENT,
   model_pk INTEGER NOT NULL,
   locale TEXT NOT NULL,
-  heading TEXT,
-  subheading TEXT,
-  summary TEXT,
-  hero_img_1 TEXT,
-  hero_img_2 TEXT,
-  hero_img_3 TEXT,
-  youtube_url_1 TEXT,
-  youtube_url_2 TEXT,
-  youtube_url_3 TEXT,
-  ig_url TEXT,
-  facebbook_url TEXT,
+  item TEXT,
+  item_key TEXT,
+  content TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (model_pk, locale)
+  UNIQUE (model_pk, locale, item)
 );
 
 CREATE INDEX IF NOT EXISTS idx_models_info_model

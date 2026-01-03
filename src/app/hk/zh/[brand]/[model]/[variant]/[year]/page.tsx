@@ -84,7 +84,9 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
 
 	type OptionRow = { listing_pk: number; item: string | null; certainty: string | null };
+	type RemarkRow = { listing_pk: number; item: string | null; remark: string | null };
 	const optionsMap = new Map<number, OptionRow[]>();
+	const remarksMap = new Map<number, RemarkRow[]>();
 
 	if (db && cars.length > 0) {
 		const listingIds = cars.map((c) => c.listing_pk);
@@ -103,6 +105,21 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 			arr.push(row);
 			optionsMap.set(row.listing_pk, arr);
 		});
+
+		const remarkResult = await db
+			.prepare(
+				`SELECT listing_pk, item, remark
+         FROM car_listing_remarks
+         WHERE listing_pk IN (${placeholders})`
+			)
+			.bind(...listingIds)
+			.all<RemarkRow>();
+
+		(remarkResult.results ?? []).forEach((row) => {
+			const arr = remarksMap.get(row.listing_pk) ?? [];
+			arr.push(row);
+			remarksMap.set(row.listing_pk, arr);
+		});
 	}
 
 	const heading =
@@ -111,7 +128,14 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 		"Model";
 
 	return (
-		<div className="min-h-screen bg-white px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+		<div className="relative min-h-screen px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+			<div
+				className="pointer-events-none fixed inset-0 -z-10"
+				style={{
+					backgroundColor: "var(--background)",
+					backgroundImage: "var(--page-bg-gradient)",
+				}}
+			/>
 			<div className="mx-auto max-w-5xl space-y-6">
 				<div className="space-y-2">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-500">{brand}</div>
@@ -130,13 +154,14 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 						const colorCode = (car.gen_color_code || "").trim();
 						const colorHex = /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(colorCode) ? colorCode : null;
 						const options = optionsMap.get(car.listing_pk) ?? [];
+						const remarks = remarksMap.get(car.listing_pk) ?? [];
 						return (
 							<a
 								key={`${car.site}-${car.url}-${idx}`}
 								href={car.url}
 								target="_blank"
 								rel="noreferrer"
-								className="flex flex-col gap-2 rounded-2xl border border-slate-900/10 bg-white p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:border-slate-900/20 hover:shadow car-detail-tile"
+								className="flex flex-col gap-2 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:shadow car-detail-tile theme-surface"
 							>
 								<div className="flex items-center justify-between">
 									<div className="text-sm font-semibold text-slate-900">{car.site || "listing"}</div>
@@ -176,11 +201,22 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 												{opt.item}
 												{opt.certainty ? (
 													<span className="text-[10px] uppercase text-slate-500">
-														{opt.certainty}
-													</span>
-												) : null}
+													{opt.certainty}
+												</span>
+											) : null}
 											</span>
 										))}
+									</div>
+								) : null}
+								{remarks.length > 0 ? (
+									<div className="space-y-1 rounded-xl bg-slate-50 p-3 text-[12px] text-slate-700">
+										<ul className="list-disc space-y-1 pl-4">
+											{remarks.map((r, idx3) => (
+												<li key={`${car.listing_pk}-remark-${idx3}`} className="leading-snug">
+													{r.remark}
+												</li>
+											))}
+										</ul>
 									</div>
 								) : null}
 							</a>

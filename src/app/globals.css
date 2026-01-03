@@ -3,6 +3,10 @@
 :root {
 	--background: #ffffff;
 	--foreground: #171717;
+	--surface: #ffffff;
+	--surface-border: rgba(15, 23, 42, 0.08);
+	--page-bg-gradient: radial-gradient(circle at top left, rgba(254, 237, 209, 0.9), rgba(247, 242, 232, 0.2) 55%), radial-gradient(circle at 70% 10%, rgba(200, 223, 240, 0.45), rgba(247, 242, 232, 0) 45%);
+	color-scheme: light;
 }
 
 @theme inline {
@@ -14,13 +18,56 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--background: #0a0a0a;
-		--foreground: #ededed;
+		--background: #0b1020;
+		--foreground: #e8edf7;
+	color-scheme: dark;
+		--surface: #121a30;
+		--surface-border: rgba(232, 237, 247, 0.15);
+		--page-bg-gradient: radial-gradient(circle at top left, rgba(49, 79, 130, 0.5), rgba(11, 16, 32, 0.4) 55%), radial-gradient(circle at 70% 10%, rgba(74, 93, 128, 0.35), rgba(11, 16, 32, 0) 45%);
 	}
+}
+
+.theme-light {
+	--background: #ffffff;
+	--foreground: #0f172a;
+	--surface: #ffffff;
+	--surface-border: rgba(15, 23, 42, 0.08);
+	--page-bg-gradient: radial-gradient(circle at top left, rgba(254, 237, 209, 0.9), rgba(247, 242, 232, 0.2) 55%), radial-gradient(circle at 70% 10%, rgba(200, 223, 240, 0.45), rgba(247, 242, 232, 0) 45%);
+	color-scheme: light;
+}
+
+.theme-dark {
+	--background: #0b1020;
+	--foreground: #e8edf7;
+	--surface: #121a30;
+	--surface-border: rgba(232, 237, 247, 0.15);
+	--page-bg-gradient: radial-gradient(circle at top left, rgba(49, 79, 130, 0.5), rgba(11, 16, 32, 0.4) 55%), radial-gradient(circle at 70% 10%, rgba(74, 93, 128, 0.35), rgba(11, 16, 32, 0) 45%);
+	color-scheme: dark;
+}
+
+.theme-surface {
+	background-color: var(--surface) !important;
+	border-color: var(--surface-border) !important;
+	color: var(--foreground);
+}
+
+/* Boost contrast for common text utility colors in dark mode */
+.theme-dark .text-slate-600 {
+	color: #d3ddf3 !important;
+}
+.theme-dark .text-slate-500 {
+	color: #c4cee6 !important;
+}
+.theme-dark .text-slate-400 {
+	color: #b3beda !important;
+}
+.theme-dark .text-slate-900 {
+	color: #e8edf7 !important;
 }
 
 body {
 	background: var(--background);
 	color: var(--foreground);
 	font-family: Arial, Helvetica, sans-serif;
+	transition: background-color 150ms ease, color 150ms ease;
 }
