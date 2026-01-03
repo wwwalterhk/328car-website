@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS car_listings (
   model_sts INTEGER DEFAULT 0, -- 0=unknown, 1=succ, 2=fail
   seats INTEGER,
   color TEXT,
+  manu_color_name TEXT,
+  gen_color_name TEXT,
+  gen_color_code TEXT,
   licence_expiry TEXT,
   body_type TEXT,
   first_registration_count INTEGER,
@@ -95,6 +98,7 @@ CREATE TABLE IF NOT EXISTS models (
   transmission_gears TEXT,
   mileage_km INTEGER,
   model_name TEXT,
+  model_name_slug TEXT,
   manu_color_name TEXT,
   gen_color_name TEXT,
   gen_color_code TEXT,
@@ -106,6 +110,29 @@ CREATE TABLE IF NOT EXISTS models (
 
 CREATE INDEX IF NOT EXISTS idx_models_brand_code
   ON models (brand_slug, manu_model_code);
+
+-- Model info content (per locale)
+CREATE TABLE IF NOT EXISTS models_info (
+  info_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  model_pk INTEGER NOT NULL,
+  locale TEXT NOT NULL,
+  heading TEXT,
+  subheading TEXT,
+  summary TEXT,
+  hero_img_1 TEXT,
+  hero_img_2 TEXT,
+  hero_img_3 TEXT,
+  youtube_url_1 TEXT,
+  youtube_url_2 TEXT,
+  youtube_url_3 TEXT,
+  ig_url TEXT,
+  facebbook_url TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (model_pk, locale)
+);
+
+CREATE INDEX IF NOT EXISTS idx_models_info_model
+  ON models_info (model_pk);
 
 -- ChatGPT batch jobs (track batch lifecycle and usage)
 CREATE TABLE IF NOT EXISTS chatgpt_batches (

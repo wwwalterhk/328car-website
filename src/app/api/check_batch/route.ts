@@ -369,8 +369,10 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 			powerKw: parsed.power_kw,
 			engineCc: parsed.engine_cc,
 			turbo: parsed.turbo,
+			bodyType: parsed.body_type,
 		})
 	);
+	const modelNameSlug = normalizeSlug(resolvedModelName);
 
 	const statements = [
 		db
@@ -378,8 +380,8 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 				`INSERT INTO models (
            brand, brand_slug, model_slug, manu_model_code, body_type, engine_cc, power_kw,
            horse_power_ps, range, power, turbo, facelift, transmission, transmission_gears,
-           mileage_km, model_name, manu_color_name, gen_color_name, gen_color_code, raw_json
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           mileage_km, model_name, model_name_slug, manu_color_name, gen_color_name, gen_color_code, raw_json
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT DO UPDATE SET
            brand = excluded.brand,
            model_slug = excluded.model_slug,
@@ -396,6 +398,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
            transmission_gears = excluded.transmission_gears,
            mileage_km = excluded.mileage_km,
            model_name = excluded.model_name,
+           model_name_slug = excluded.model_name_slug,
            manu_color_name = excluded.manu_color_name,
            gen_color_name = excluded.gen_color_name,
            gen_color_code = excluded.gen_color_code,
@@ -418,6 +421,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 				parsed.transmission_gears,
 				parsed.mileage_km,
 				resolvedModelName,
+				modelNameSlug,
 				parsed.manu_color_name,
 				parsed.gen_color_name,
 				parsed.gen_color_code,
@@ -437,7 +441,10 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
            ORDER BY model_pk DESC
            LIMIT 1
          ),
-         model_sts = 1
+         model_sts = 1,
+         manu_color_name = ?,
+         gen_color_name = ?,
+         gen_color_code = ?
          WHERE site = ? AND id = ?`
 			)
 			.bind(
@@ -447,6 +454,9 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 				modelSlug,
 				parsed.manu_model_code,
 				resolvedModelName,
+				parsed.manu_color_name,
+				parsed.gen_color_name,
+				parsed.gen_color_code,
 				parsed.site,
 				parsed.id
 			),
@@ -649,12 +659,13 @@ function buildModelSlugInput(opts: {
 	powerKw: string | null;
 	engineCc: string | null;
 	turbo: string | null;
+	bodyType: string | null;
 }): string | null {
 	if (!opts.modelName) return null;
 	const isElectric = opts.power?.toLowerCase() === "electric";
 	const parts = isElectric
-		? [opts.modelName, opts.manuModelCode, opts.manuModelCode, opts.powerKw]
-		: [opts.modelName, opts.manuModelCode, opts.engineCc, opts.turbo];
+		? [opts.modelName, opts.manuModelCode, opts.manuModelCode, opts.powerKw, opts.bodyType]
+		: [opts.modelName, opts.manuModelCode, opts.engineCc, opts.turbo, opts.bodyType];
 	return parts
 		.filter((part) => typeof part === "string" && part.trim())
 		.join("-");

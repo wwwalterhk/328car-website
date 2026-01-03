@@ -8,6 +8,7 @@ export { DOShardedTagCache } from "./.open-next/.build/durable-objects/sharded-t
 export { BucketCachePurge } from "./.open-next/.build/durable-objects/bucket-cache-purge.js";
 
 const CHECK_BATCH_URL = "https://internal/api/check_batch";
+const CREATE_BATCH_URL = "https://internal/api/create_batch";
 const NEXT_BASE_PATH = globalThis.__NEXT_BASE_PATH__ || "";
 const NEXT_TRAILING_SLASH = Boolean(globalThis.__TRAILING_SLASH__);
 
@@ -46,12 +47,24 @@ async function handleFetch(request, env, ctx) {
 
 export default {
 	fetch: handleFetch,
-	scheduled(_event, env, ctx) {
-		const request = new Request(CHECK_BATCH_URL, { method: "GET" });
-		ctx.waitUntil(
-			Promise.resolve(handleFetch(request, env, ctx)).catch((error) => {
-				console.error("Cron check_batch failed", error);
-			})
-		);
+	scheduled(event, env, ctx) {
+		const cron = event?.cron;
+		const jobs = [];
+
+		const scheduleCall = (url, label) =>
+			Promise.resolve(handleFetch(new Request(url, { method: "GET" }), env, ctx)).catch((error) => {
+				console.error(`Cron ${label} failed`, error);
+			});
+
+		if (!cron || cron === "*/3 * * * *") {
+			jobs.push(scheduleCall(CREATE_BATCH_URL, "create_batch"));
+		}
+		if (!cron || cron === "*/15 * * * *") {
+			jobs.push(scheduleCall(CHECK_BATCH_URL, "check_batch"));
+		}
+
+		if (jobs.length) {
+			ctx.waitUntil(Promise.all(jobs));
+		}
 	},
 };
