@@ -484,7 +484,7 @@ function parseModelOutput(payload: unknown): ModelOutput | null {
 	const id = readString(payload.id);
 	if (!site || !id) return null;
 
-	const modelName = readString(payload.model_name) ?? readString(payload.detail_model_name);
+	const modelName = readSanitizedString(payload.model_name) ?? readSanitizedString(payload.detail_model_name);
 	const options = parseOptions(payload.options);
 	const remarks = parseRemarks(payload.remark);
 	const rawJson = JSON.stringify(payload);
@@ -492,23 +492,23 @@ function parseModelOutput(payload: unknown): ModelOutput | null {
 	return {
 		site,
 		id,
-		brand: readString(payload.brand),
-		manu_model_code: readNullableText(payload.manu_model_code),
-		body_type: readNullableText(payload.body_type),
-		engine_cc: readNullableText(payload.engine_cc),
-		power_kw: readNullableText(payload.power_kw),
-		horse_power_ps: readNullableText(payload.horse_power_ps),
-		facelift: readNullableText(payload.facelift),
-		transmission: readNullableText(payload.transmission),
-		transmission_gears: readNullableText(payload.transmission_gears),
-		range: readNullableText(payload.range),
-		power: readNullableText(payload.power),
-		turbo: readNullableText(payload.turbo),
+		brand: readSanitizedString(payload.brand),
+		manu_model_code: readSanitizedNullableText(payload.manu_model_code),
+		body_type: readSanitizedNullableText(payload.body_type),
+		engine_cc: readSanitizedNullableText(payload.engine_cc),
+		power_kw: readSanitizedNullableText(payload.power_kw),
+		horse_power_ps: readSanitizedNullableText(payload.horse_power_ps),
+		facelift: readSanitizedNullableText(payload.facelift),
+		transmission: readSanitizedNullableText(payload.transmission),
+		transmission_gears: readSanitizedNullableText(payload.transmission_gears),
+		range: readSanitizedNullableText(payload.range),
+		power: readSanitizedNullableText(payload.power),
+		turbo: readSanitizedNullableText(payload.turbo),
 		mileage_km: readNullableInteger(payload.mileage_km),
 		model_name: modelName,
-		manu_color_name: readNullableText(payload.manu_color_name),
-		gen_color_name: readNullableText(payload.gen_color_name),
-		gen_color_code: readNullableText(payload.gen_color_code),
+		manu_color_name: readSanitizedNullableText(payload.manu_color_name),
+		gen_color_name: readSanitizedNullableText(payload.gen_color_name),
+		gen_color_code: readSanitizedNullableText(payload.gen_color_code),
 		options,
 		remarks,
 		raw_json: rawJson,
@@ -586,9 +586,27 @@ function readString(value: unknown): string | null {
 	return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function readSanitizedString(value: unknown): string | null {
+	const raw = readString(value);
+	if (!raw) return null;
+	const cleaned = stripParenthetical(raw);
+	return cleaned ? cleaned : null;
+}
+
 function readNullableText(value: unknown): string | null {
 	if (typeof value === "string") {
 		const trimmed = value.trim();
+		return trimmed ? trimmed : null;
+	}
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return String(value);
+	}
+	return null;
+}
+
+function readSanitizedNullableText(value: unknown): string | null {
+	if (typeof value === "string") {
+		const trimmed = stripParenthetical(value).trim();
 		return trimmed ? trimmed : null;
 	}
 	if (typeof value === "number" && Number.isFinite(value)) {
@@ -602,7 +620,7 @@ function readNullableInteger(value: unknown): number | null {
 		return Math.trunc(value);
 	}
 	if (typeof value === "string") {
-		const trimmed = value.trim();
+		const trimmed = stripParenthetical(value).trim();
 		if (!trimmed) return null;
 		const parsed = Number(trimmed);
 		if (Number.isFinite(parsed)) return Math.trunc(parsed);
@@ -618,6 +636,10 @@ function normalizeSlug(value: string | null): string | null {
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/(^-|-$)/g, "");
 	return slug || null;
+}
+
+function stripParenthetical(value: string): string {
+	return value.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function buildModelSlugInput(opts: {

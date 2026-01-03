@@ -73,7 +73,7 @@ WHERE 1=1
     SELECT listing_pk
     FROM chatgpt_batch_items
     WHERE listing_pk IS NOT NULL
-      AND status IN ('pending','submitted','running')
+      
   )
 `;
 
