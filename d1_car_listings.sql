@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS models (
   manu_color_name TEXT,
   gen_color_name TEXT,
   gen_color_code TEXT,
+  remark TEXT,
+  tect_remark TEXT,
   raw_json TEXT, -- original JSON payload for audit/debug
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (brand_slug, model_slug),
@@ -278,6 +280,25 @@ INSERT OR IGNORE INTO brands (slug, name_en, name_zh_tw, name_zh_hk) VALUES
   ('sinotruk', 'Sinotruk', '中國重汽', '中國重汽'),
   ('ssangyong', 'SsangYong', '雙龍', '雙龍');
 
+INSERT OR IGNORE INTO brands (slug, name_en, name_zh_hk, sts)
+VALUES
+  ('kawasaki', 'Kawasaki', '川崎', 1),
+  ('ducati', 'Ducati', '杜卡迪', 1),
+  ('harley-davidson', 'Harley-Davidson', '哈雷戴維森', 1),
+  ('ktm', 'KTM', 'KTM', 1),
+  ('triumph', 'Triumph', '凱旋', 1),
+  ('bmw-motorrad', 'BMW Motorrad', 'BMW 電單車', 0),
+  ('aprilia', 'Aprilia', '阿普利亞', 1),
+  ('piaggio', 'Piaggio', '比亞喬', 1),
+  ('vespa', 'Vespa', '偉士牌', 1),
+  ('moto-guzzi', 'Moto Guzzi', '摩托古茲', 0),
+  ('indian', 'Indian Motorcycle', '印第安摩托', 0),
+  ('royal-enfield', 'Royal Enfield', '皇家恩菲爾德', 0),
+  ('cfmoto', 'CFMoto', '春風摩托', 0),
+  ('benelli', 'Benelli', '貝納利', 0),
+  ('sym', 'SYM', '三陽', 1),
+  ('kymco', 'Kymco', '光陽', 1),
+  ('bajaj', 'Bajaj', '巴賈吉', 0);
 
 
 -- Core users

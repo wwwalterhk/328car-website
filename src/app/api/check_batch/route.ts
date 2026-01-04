@@ -301,12 +301,12 @@ async function processBatchFiles(
 							? extractOutputTextFromResponseBody(responseBody)
 							: null;
 					if (outputText && hasListingPk) {
-						// Only process when listing model_sts is NULL
+						// Only process when listing model_pk is NULL
 						const listingModel = await db
-							.prepare("SELECT model_sts FROM car_listings WHERE site = ? AND id = ? LIMIT 1")
+							.prepare("SELECT model_pk FROM car_listings WHERE site = ? AND id = ? LIMIT 1")
 							.bind(site, listingId)
-							.first<{ model_sts: number | null }>();
-						if (listingModel?.model_sts === null) {
+							.first<{ model_pk: number | null }>();
+						if (listingModel?.model_pk === null) {
 							const parsed = safeJsonParse<unknown>(outputText);
 							if (parsed) {
 								await applyModelOutput(db, parsed);
@@ -476,7 +476,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 					manu_color_name = ?,
 					gen_color_name = ?,
 					gen_color_code = ?
-				WHERE model_sts is null AND site = ? AND id = ?`
+				WHERE model_pk is null AND site = ? AND id = ?`
 			)
 			.bind(
 				brandSlug,
