@@ -6,17 +6,15 @@ type Brand = { slug: string; name_en: string | null; name_zh_hk: string | null }
 type ModelRow = {
 	model_pk: number;
 	model_name: string | null;
-	model_name_slug: string | null;
-	model_slug: string | null;
 	manu_model_code: string | null;
 	body_type: string | null;
 	power: string | null;
 	engine_cc: string | null;
 	power_kw: string | null;
 	facelift: string | null;
-	remark: string | null;
-	tech_remark: string | null;
-	listing_count: number;
+	listing_count?: number | null;
+	min_year?: number | null;
+	max_year?: number | null;
 };
 
 async function fetchBrands(): Promise<Brand[]> {
@@ -40,9 +38,9 @@ export default function ModelMergeAdminPage() {
 	const [targetPk, setTargetPk] = useState<number | null>(null);
 	const [mergePks, setMergePks] = useState<Set<number>>(new Set());
 	const [message, setMessage] = useState<string | null>(null);
-	const [editingPk, setEditingPk] = useState<number | null>(null);
-	const [editingRemark, setEditingRemark] = useState<string>("");
-	const [editingTechRemark, setEditingTechRemark] = useState<string>("");
+	const [listingModal, setListingModal] = useState<{ modelName: string | null; rows: Array<Record<string, unknown>> } | null>(
+		null
+	);
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
@@ -80,43 +78,22 @@ export default function ModelMergeAdminPage() {
 		});
 	};
 
-	const startEdit = (row: ModelRow) => {
-		setEditingPk(row.model_pk);
-		setEditingRemark(row.remark ?? "");
-		setEditingTechRemark(row.tech_remark ?? "");
-	};
-
-	const saveEdit = async () => {
-		if (!editingPk) return;
+	const loadListings = async (modelPk: number, modelName: string | null) => {
 		try {
-			const res = await fetch("/api/models", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					model_pk: editingPk,
-					remark: editingRemark || null,
-					tech_remark: editingTechRemark || null,
-				}),
-			});
+			const res = await fetch(`/api/models/listings?model_pk=${modelPk}`, { cache: "no-store" });
 			if (!res.ok) {
-				setMessage("Failed to save remarks");
+				setMessage("Failed to load listings");
 				return;
 			}
-			setModels((prev) =>
-				prev.map((m) =>
-					m.model_pk === editingPk ? { ...m, remark: editingRemark || null, tech_remark: editingTechRemark || null } : m
-				)
-			);
-			setMessage("Saved");
+			const data = (await res.json()) as { listings?: Array<Record<string, unknown>> };
+			setListingModal({ modelName, rows: data.listings || [] });
 		} catch (error) {
-			setMessage(`Save error: ${error}`);
-		} finally {
-			setEditingPk(null);
+			setMessage(`Load error: ${error}`);
 		}
 	};
 
 	return (
-		<div className="relative min-h-screen px-4 py-10 text-slate-900 sm:px-8 lg:px-12">
+		<div className="relative min-h-screen px-4 py-8 text-slate-900 sm:px-8 lg:px-12">
 			<div
 				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
@@ -148,38 +125,47 @@ export default function ModelMergeAdminPage() {
 				</div>
 
 				<div className="overflow-auto rounded-2xl border border-slate-200/70 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.6)] theme-surface">
-					<table className="min-w-full border-collapse text-[12px] sm:text-[13px]">
-						<thead className="bg-gradient-to-r from-slate-50 to-slate-100 text-slate-700 dark:from-slate-800 dark:to-slate-900 dark:text-slate-50">
+					<table className="min-w-full border-collapse text-[11px] sm:text-[12px]">
+						<thead className="sticky top-0 z-10 bg-gradient-to-r from-slate-50 to-slate-100 text-slate-700 shadow-sm dark:from-slate-800 dark:to-slate-900 dark:text-slate-50">
 							<tr>
-								<th className="border-b px-3 py-2 text-left">Merge?</th>
-								<th className="border-b px-3 py-2 text-left">Target</th>
-								<th className="border-b px-3 py-2 text-left">model_name</th>
-								<th className="border-b px-3 py-2 text-left">model_name_slug</th>
-								<th className="border-b px-3 py-2 text-left">model_slug</th>
-								<th className="border-b px-3 py-2 text-left">manu_model_code</th>
-								<th className="border-b px-3 py-2 text-left">body_type</th>
-								<th className="border-b px-3 py-2 text-left">power</th>
-								<th className="border-b px-3 py-2 text-left">engine_cc / power_kw</th>
-								<th className="border-b px-3 py-2 text-left">facelift</th>
-								<th className="border-b px-3 py-2 text-left">listings</th>
-								<th className="border-b px-3 py-2 text-left">Copy</th>
+								<th className="border-b px-2 py-1.5 text-left">Merge?</th>
+								<th className="border-b px-2 py-1.5 text-left">Target</th>
+								<th className="border-b px-2 py-1.5 text-left">model_name</th>
+								<th className="border-b px-2 py-1.5 text-left">manu_model_code</th>
+								<th className="border-b px-2 py-1.5 text-left">body_type</th>
+								<th className="border-b px-2 py-1.5 text-left">power</th>
+								<th className="border-b px-2 py-1.5 text-left">engine_cc</th>
+								<th className="border-b px-2 py-1.5 text-left">power_kw</th>
+								<th className="border-b px-2 py-1.5 text-left">facelift</th>
+								<th className="border-b px-2 py-1.5 text-left">listings</th>
+								<th className="border-b px-2 py-1.5 text-left">years</th>
+								<th className="border-b px-2 py-1.5 text-left">View</th>
+								<th className="border-b px-2 py-1.5 text-left">Copy</th>
 							</tr>
 						</thead>
 						<tbody>
-							{models.map((m) => {
+							{models.map((m, idx) => {
 								const checked = mergePks.has(m.model_pk);
 								const isTarget = targetPk === m.model_pk;
-								const rowClass = `border-b last:border-b-0 transition ${
+								const samePrefix =
+									idx > 0 &&
+									typeof m.model_name === "string" &&
+									typeof models[idx - 1].model_name === "string" &&
+									m.model_name.slice(0, 2).toLowerCase() === models[idx - 1].model_name!.slice(0, 2).toLowerCase();
+
+								const zebra = idx % 2 === 0 ? "bg-white/70 dark:bg-slate-900/60" : "bg-slate-50/70 dark:bg-slate-800/50";
+								const prefixGroupClass = samePrefix ? "border-l-4 border-l-amber-400/70" : "border-l border-l-transparent";
+								const rowClass = `border-b last:border-b-0 transition ${prefixGroupClass} ${
 									isTarget
 										? "bg-emerald-50/70 dark:bg-emerald-900/30"
 										: checked
-											? "bg-slate-50/80 dark:bg-slate-800/40"
-											: "hover:bg-slate-50/70 dark:hover:bg-slate-800/50"
-								}`;
+											? "bg-slate-100/80 dark:bg-slate-800/60"
+											: zebra
+								} hover:bg-slate-100/80 dark:hover:bg-slate-800/60`;
 								return (
 									<Fragment key={m.model_pk}>
 										<tr key={m.model_pk} className={rowClass}>
-											<td className="px-2 py-1.5">
+											<td className="px-2 py-1">
 												<input
 													type="checkbox"
 													checked={checked}
@@ -187,7 +173,7 @@ export default function ModelMergeAdminPage() {
 													className="h-4 w-4"
 												/>
 											</td>
-											<td className="px-2 py-1.5">
+											<td className="px-2 py-1">
 												<input
 													type="radio"
 													name="target"
@@ -196,46 +182,73 @@ export default function ModelMergeAdminPage() {
 													className="h-4 w-4"
 												/>
 											</td>
-											<td className="px-2 py-1.5 text-slate-900 dark:text-slate-50">{m.model_name || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.model_name_slug || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.model_slug || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.manu_model_code || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.body_type || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.power || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">
-												{m.power && m.power.toLowerCase() === "electric" ? m.power_kw || "—" : m.engine_cc || "—"}
+											<td className="px-2 py-1 text-slate-900 dark:text-slate-50">
+												<span className={samePrefix ? "font-semibold" : ""}>{m.model_name || "—"}</span>
 											</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.facelift || "—"}</td>
-											<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.listing_count ?? 0}</td>
-											<td className="px-2 py-1.5">
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.manu_model_code || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.body_type || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.power || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.engine_cc || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.power_kw || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.facelift || "—"}</td>
+											<td className="px-2 py-1">
+												<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
+													{m.listing_count ?? 0}
+												</span>
+											</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">
+												{m.min_year || m.max_year ? (
+													<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
+														{m.min_year === m.max_year || !m.max_year
+															? m.min_year ?? m.max_year
+															: `${m.min_year ?? "?"}–${m.max_year ?? "?"}`}
+													</span>
+												) : (
+													"—"
+												)}
+											</td>
+											<td className="px-2 py-1">
+												<button
+													type="button"
+													className="rounded border px-2 py-1 text-[11px] text-slate-700 transition hover:-translate-y-0.5 hover:shadow dark:border-slate-600 dark:text-slate-100"
+													onClick={() => loadListings(m.model_pk, m.model_name)}
+												>
+													List
+												</button>
+											</td>
+											<td className="px-2 py-1">
 												<div className="flex items-center gap-2">
 													<button
 														type="button"
-														className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:text-slate-100"
+														className="rounded border px-2 py-1 text-[11px] text-slate-700 hover:-translate-y-0.5 hover:shadow"
 														onClick={() => {
-															const rowJson = JSON.stringify(m, null, 2);
+															// Copy only the pared-down fields plus brand
+															const {
+																model_pk,
+																model_name_slug,
+																model_slug,
+																remark,
+																tech_remark,
+																listing_count,
+																min_year,
+																max_year,
+																...rest
+															} = m as Record<string, unknown>;
+															const payload = {
+																brand: selectedBrand,
+																...(rest as Record<string, unknown>),
+																min_year: m.min_year ?? min_year ?? null,
+																max_year: m.max_year ?? max_year ?? null,
+																listing_count: m.listing_count ?? listing_count ?? null,
+															};
+															const rowJson = JSON.stringify(payload, null, 2);
 															void navigator.clipboard.writeText(rowJson);
-															setMessage("Copied row to clipboard");
+															setMessage(`Copied ${selectedBrand || "brand"} row to clipboard`);
 														}}
 													>
 														Copy
 													</button>
-													<button
-														type="button"
-														className="rounded border border-emerald-300 px-2 py-1 text-[11px] text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-700 dark:text-emerald-200"
-														onClick={() => startEdit(m)}
-													>
-														Edit
-													</button>
 												</div>
-											</td>
-										</tr>
-										<tr className="border-b last:border-b-0">
-											<td colSpan={12} className="px-3 pb-2 text-[11px] text-slate-600 dark:text-slate-200">
-												<span className="mr-3 font-semibold">Remark:</span>
-												<span className="mr-4">{m.remark || "—"}</span>
-												<span className="mr-3 font-semibold">Tech:</span>
-												<span>{m.tech_remark || "—"}</span>
 											</td>
 										</tr>
 									</Fragment>
@@ -261,46 +274,6 @@ export default function ModelMergeAdminPage() {
 					</div>
 				</div>
 
-				{editingPk ? (
-					<div className="space-y-2 rounded-2xl border border-emerald-200/70 bg-white/90 p-4 shadow-[0_18px_40px_-28px_rgba(16,185,129,0.4)] backdrop-blur theme-surface dark:border-emerald-900/60 dark:bg-emerald-950/30">
-						<div className="flex items-center justify-between">
-							<h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-								Edit remarks for model_pk: {editingPk}
-							</h3>
-							<div className="flex gap-2">
-								<button
-									type="button"
-									className="rounded border px-3 py-1 text-[12px]"
-									onClick={() => setEditingPk(null)}
-								>
-									Cancel
-								</button>
-								<button
-									type="button"
-									className="rounded border border-emerald-500 bg-emerald-500 px-3 py-1 text-[12px] text-white"
-									onClick={saveEdit}
-								>
-									Save
-								</button>
-							</div>
-						</div>
-						<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Remark</label>
-						<textarea
-							className="w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
-							rows={2}
-							value={editingRemark}
-							onChange={(e) => setEditingRemark(e.target.value)}
-						/>
-						<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Tech remark</label>
-						<textarea
-							className="w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
-							rows={2}
-							value={editingTechRemark}
-							onChange={(e) => setEditingTechRemark(e.target.value)}
-						/>
-					</div>
-				) : null}
-
 				{message ? (
 					<div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800">
 						<span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -308,6 +281,83 @@ export default function ModelMergeAdminPage() {
 					</div>
 				) : null}
 			</div>
+
+			{listingModal ? (
+				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-3xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<div className="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Listings</div>
+								<div className="text-base font-semibold text-slate-800 dark:text-slate-100">
+									{listingModal.modelName || "Model"}
+								</div>
+							</div>
+							<button
+								type="button"
+								className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+								onClick={() => setListingModal(null)}
+								aria-label="Close"
+							>
+								×
+							</button>
+						</div>
+						<div className="max-h-[60vh] overflow-auto rounded-xl border border-slate-200/70 dark:border-slate-800/60">
+							<table className="min-w-full border-collapse text-[11px] sm:text-[12px]">
+								<thead className="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-100">
+									<tr>
+										<th className="border-b px-2 py-1 text-left">site</th>
+										<th className="border-b px-2 py-1 text-left">id</th>
+										<th className="border-b px-2 py-1 text-left">year</th>
+										<th className="border-b px-2 py-1 text-left">price</th>
+										<th className="border-b px-2 py-1 text-left">discount</th>
+										<th className="border-b px-2 py-1 text-left">sold</th>
+										<th className="border-b px-2 py-1 text-left">url</th>
+									</tr>
+								</thead>
+								<tbody>
+									{listingModal.rows.map((row, i) => (
+										<tr
+											key={row.listing_pk ? String(row.listing_pk) : i}
+											className={i % 2 === 0 ? "bg-white dark:bg-slate-900/70" : "bg-slate-50 dark:bg-slate-800/70"}
+										>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">{String(row.site ?? "—")}</td>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">{String(row.id ?? "—")}</td>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">
+												{String(row.year ?? "—")}
+											</td>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">
+												{String(row.price ?? "—")}
+											</td>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">
+												{String(row.discount_price ?? "—")}
+											</td>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">
+												{String(row.sold ?? "—")}
+											</td>
+											<td className="border-b px-2 py-1 text-slate-700 dark:text-slate-100">
+												{row.url ? (
+													<a className="text-emerald-600 underline" href={String(row.url)} target="_blank" rel="noreferrer">
+														link
+													</a>
+												) : (
+													"—"
+												)}
+											</td>
+										</tr>
+									))}
+									{!listingModal.rows.length ? (
+										<tr>
+											<td colSpan={7} className="px-3 py-4 text-center text-slate-500">
+												No listings
+											</td>
+										</tr>
+									) : null}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 }

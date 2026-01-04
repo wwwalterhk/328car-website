@@ -15,6 +15,8 @@ type ModelRow = {
 	remark: string | null;
 	tech_remark: string | null;
 	listing_count: number;
+	min_year: number | null;
+	max_year: number | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -47,6 +49,9 @@ export async function GET(request: NextRequest) {
          m.remark,
          m.tech_remark,
          COUNT(c.listing_pk) AS listing_count
+         ,
+         MIN(c.year) AS min_year,
+         MAX(c.year) AS max_year
        FROM models m
        LEFT JOIN car_listings c ON c.model_pk = m.model_pk
        WHERE m.brand_slug = ?
