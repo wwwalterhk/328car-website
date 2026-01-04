@@ -17,6 +17,8 @@ type ModelRow = {
 	listing_count: number;
 	min_year: number | null;
 	max_year: number | null;
+	group_name: string | null;
+	group_slug: string | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -48,16 +50,20 @@ export async function GET(request: NextRequest) {
          m.facelift,
          m.remark,
          m.tech_remark,
+         g.group_name,
+         g.group_slug,
          COUNT(c.listing_pk) AS listing_count
          ,
          MIN(c.year) AS min_year,
          MAX(c.year) AS max_year
        FROM models m
        LEFT JOIN car_listings c ON c.model_pk = m.model_pk
+       LEFT JOIN model_groups g ON m.model_groups_pk = g.model_groups_pk
        WHERE m.brand_slug = ?
        GROUP BY
          m.model_pk, m.model_name, m.model_name_slug, m.model_slug,
-         m.manu_model_code, m.body_type, m.power, m.engine_cc, m.power_kw, m.facelift, m.remark, m.tech_remark
+         m.manu_model_code, m.body_type, m.power, m.engine_cc, m.power_kw, m.facelift, m.remark, m.tech_remark,
+         g.group_name, g.group_slug
        ORDER BY m.model_name_slug IS NULL, m.model_name_slug, m.model_slug`
 			)
 			.bind(brand)

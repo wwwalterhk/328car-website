@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS models (
   gen_color_code TEXT,
   remark TEXT,
   tech_remark TEXT,
+  model_groups_pk INTEGER,
   raw_json TEXT, -- original JSON payload for audit/debug
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (brand_slug, model_slug),
@@ -143,6 +144,19 @@ CREATE TABLE IF NOT EXISTS models_item (
   content TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (model_pk, locale, item)
+);
+
+
+CREATE TABLE IF NOT EXISTS model_groups (
+  model_groups_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_slug TEXT NOT NULL,
+  group_slug TEXT NOT NULL,
+  group_name TEXT NOT NULL,
+  heading TEXT,
+  subheading TEXT,
+  summary TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (brand_slug, group_slug)
 );
 
 CREATE INDEX IF NOT EXISTS idx_models_info_model

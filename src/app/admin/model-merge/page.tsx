@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 type Brand = { slug: string; name_en: string | null; name_zh_hk: string | null };
+type GroupOption = { pk: number; slug: string; name: string };
 type ModelRow = {
 	model_pk: number;
 	model_name: string | null;
@@ -15,6 +16,8 @@ type ModelRow = {
 	listing_count?: number | null;
 	min_year?: number | null;
 	max_year?: number | null;
+	group_name?: string | null;
+	group_slug?: string | null;
 };
 
 async function fetchBrands(): Promise<Brand[]> {
@@ -41,6 +44,16 @@ export default function ModelMergeAdminPage() {
 	const [listingModal, setListingModal] = useState<{ modelName: string | null; rows: Array<Record<string, unknown>> } | null>(
 		null
 	);
+	const [groupModalOpen, setGroupModalOpen] = useState(false);
+	const [groupForm, setGroupForm] = useState({
+		group_name: "",
+		heading: "",
+		subheading: "",
+		summary: "",
+	});
+	const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
+	const [assignModalOpen, setAssignModalOpen] = useState(false);
+	const [assignGroupPk, setAssignGroupPk] = useState<number | null>(null);
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
@@ -51,6 +64,7 @@ export default function ModelMergeAdminPage() {
 			setModels([]);
 			setTargetPk(null);
 			setMergePks(new Set());
+			setGroupOptions([]);
 			return;
 		}
 		fetchModels(selectedBrand).then((rows) => {
@@ -58,6 +72,21 @@ export default function ModelMergeAdminPage() {
 			setTargetPk(null);
 			setMergePks(new Set());
 		});
+		// load groups for the brand
+		fetch(`/api/model-groups?brand=${encodeURIComponent(selectedBrand)}`, { cache: "no-store" })
+			.then((res) => (res.ok ? res.json() : Promise.reject()))
+			.then((data: unknown) => {
+				const groups = (data as { groups?: Array<{ model_groups_pk?: number; group_slug?: string; group_name?: string }> })
+					.groups;
+				const opts: GroupOption[] =
+					groups?.map((g) => ({
+						pk: Number(g.model_groups_pk) || 0,
+						slug: g.group_slug || "",
+						name: g.group_name || g.group_slug || "",
+					})) ?? [];
+				setGroupOptions(opts.filter((g) => g.pk > 0));
+			})
+			.catch(() => setGroupOptions([]));
 	}, [selectedBrand]);
 
 	const brandOptions = useMemo(
@@ -110,18 +139,36 @@ export default function ModelMergeAdminPage() {
 
 				<div className="rounded-2xl border border-slate-200/70 bg-white/80 p-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.6)] backdrop-blur theme-surface space-y-3 dark:border-slate-800/60 dark:bg-slate-900/60">
 					<label className="text-[13px] font-semibold text-slate-700 dark:text-slate-100">Brand</label>
-					<select
-						className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] sm:text-sm shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
-						value={selectedBrand}
-						onChange={(e) => setSelectedBrand(e.target.value)}
-					>
-						<option value="">Select a brand</option>
-						{brandOptions.map((opt) => (
-							<option key={opt.value} value={opt.value}>
-								{opt.label}
-							</option>
-						))}
-					</select>
+					<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+						<select
+							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] sm:text-sm shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+							value={selectedBrand}
+							onChange={(e) => setSelectedBrand(e.target.value)}
+						>
+							<option value="">Select a brand</option>
+							{brandOptions.map((opt) => (
+								<option key={opt.value} value={opt.value}>
+									{opt.label}
+								</option>
+							))}
+						</select>
+						<button
+							type="button"
+							disabled={!selectedBrand}
+							onClick={() => setGroupModalOpen(true)}
+							className="inline-flex items-center justify-center rounded-lg border border-emerald-500 bg-emerald-500 px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+						>
+							New group
+						</button>
+						<button
+							type="button"
+							disabled={!selectedBrand || !groupOptions.length || mergePks.size === 0}
+							onClick={() => setAssignModalOpen(true)}
+							className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+						>
+							Assign group
+						</button>
+					</div>
 				</div>
 
 				<div className="overflow-auto rounded-2xl border border-slate-200/70 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.6)] theme-surface">
@@ -139,6 +186,7 @@ export default function ModelMergeAdminPage() {
 								<th className="border-b px-2 py-1.5 text-left">facelift</th>
 								<th className="border-b px-2 py-1.5 text-left">listings</th>
 								<th className="border-b px-2 py-1.5 text-left">years</th>
+								<th className="border-b px-2 py-1.5 text-left">group</th>
 								<th className="border-b px-2 py-1.5 text-left">View</th>
 								<th className="border-b px-2 py-1.5 text-left">Copy</th>
 							</tr>
@@ -207,6 +255,15 @@ export default function ModelMergeAdminPage() {
 													"—"
 												)}
 											</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">
+												{m.group_name ? (
+													<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 dark:ring-emerald-800/60">
+														{m.group_name}
+													</span>
+												) : (
+													"—"
+												)}
+											</td>
 											<td className="px-2 py-1">
 												<button
 													type="button"
@@ -256,7 +313,7 @@ export default function ModelMergeAdminPage() {
 							})}
 							{!models.length ? (
 								<tr>
-									<td colSpan={12} className="px-3 py-4 text-center text-sm text-slate-500">
+									<td colSpan={14} className="px-3 py-4 text-center text-sm text-slate-500">
 										No models yet for this brand.
 									</td>
 								</tr>
@@ -354,6 +411,203 @@ export default function ModelMergeAdminPage() {
 									) : null}
 								</tbody>
 							</table>
+						</div>
+					</div>
+				</div>
+			) : null}
+
+			{groupModalOpen ? (
+				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<div className="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-300">New model group</div>
+									<div className="text-base font-semibold text-slate-800 dark:text-slate-100">
+										Brand: {selectedBrand || "—"}
+									</div>
+							</div>
+							<button
+								type="button"
+								className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+								onClick={() => setGroupModalOpen(false)}
+								aria-label="Close"
+							>
+								×
+							</button>
+						</div>
+						<div className="grid grid-cols-1 gap-3">
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Group name</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={groupForm.group_name}
+									onChange={(e) => setGroupForm((prev) => ({ ...prev, group_name: e.target.value }))}
+								/>
+							</div>
+							{groupOptions.length ? (
+								<div className="text-[12px] text-slate-600 dark:text-slate-200">
+									Existing groups:{" "}
+									<span className="inline-flex flex-wrap gap-2">
+										{groupOptions.map((g) => (
+											<span
+												key={g.slug}
+												className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
+											>
+												{g.name}
+											</span>
+										))}
+									</span>
+								</div>
+							) : null}
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Heading</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={groupForm.heading}
+									onChange={(e) => setGroupForm((prev) => ({ ...prev, heading: e.target.value }))}
+								/>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Subheading</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={groupForm.subheading}
+									onChange={(e) => setGroupForm((prev) => ({ ...prev, subheading: e.target.value }))}
+								/>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Summary</label>
+								<textarea
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									rows={3}
+									value={groupForm.summary}
+									onChange={(e) => setGroupForm((prev) => ({ ...prev, summary: e.target.value }))}
+								/>
+							</div>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+								onClick={() => setGroupModalOpen(false)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="rounded-lg border border-emerald-500 bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-600 dark:bg-emerald-600 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+								disabled={!selectedBrand || !groupForm.group_name}
+								onClick={async () => {
+									const slug = (groupForm.group_name || "")
+										.toLowerCase()
+										.trim()
+										.replace(/[^a-z0-9]+/g, "-")
+										.replace(/(^-|-$)/g, "");
+									try {
+										const res = await fetch("/api/model-groups", {
+											method: "POST",
+											headers: { "content-type": "application/json" },
+											body: JSON.stringify({ brand_slug: selectedBrand, group_slug: slug, ...groupForm }),
+										});
+										if (!res.ok) {
+											setMessage("Failed to create group");
+											return;
+										}
+										const resJson = (await res.json()) as { model_groups_pk?: number };
+										setMessage("Group created");
+										setGroupModalOpen(false);
+										setGroupOptions((prev) => [
+											...prev,
+											{ pk: resJson.model_groups_pk || 0, slug, name: groupForm.group_name },
+										]);
+										setGroupForm({ group_name: "", heading: "", subheading: "", summary: "" });
+									} catch (error) {
+										setMessage(`Create error: ${error}`);
+									}
+								}}
+							>
+								Save group
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
+
+			{assignModalOpen ? (
+				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-md space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<div className="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
+									Assign model group
+								</div>
+								<div className="text-base font-semibold text-slate-800 dark:text-slate-100">
+									Selected: {mergePks.size} rows
+								</div>
+							</div>
+							<button
+								type="button"
+								className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+								onClick={() => setAssignModalOpen(false)}
+								aria-label="Close"
+							>
+								×
+							</button>
+						</div>
+						<div className="space-y-2">
+							<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Model group</label>
+							<select
+								className="w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+								value={assignGroupPk ?? ""}
+								onChange={(e) => setAssignGroupPk(e.target.value ? Number(e.target.value) : null)}
+							>
+								<option value="">Select group</option>
+								{groupOptions.map((g) => (
+									<option key={g.pk} value={g.pk}>
+										{g.name}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+								onClick={() => setAssignModalOpen(false)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="rounded-lg border border-emerald-500 bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-600 dark:bg-emerald-600 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+								disabled={!assignGroupPk || mergePks.size === 0}
+								onClick={async () => {
+									if (!assignGroupPk || mergePks.size === 0) return;
+									try {
+										const res = await fetch("/api/model-groups", {
+											method: "PATCH",
+											headers: { "content-type": "application/json" },
+											body: JSON.stringify({ model_groups_pk: assignGroupPk, model_pks: Array.from(mergePks) }),
+										});
+										if (!res.ok) {
+											setMessage("Failed to assign group");
+											return;
+										}
+										setMessage("Group assigned");
+										setAssignModalOpen(false);
+										setAssignGroupPk(null);
+										setMergePks(new Set());
+										// refresh models to reflect new groups
+										if (selectedBrand) {
+											fetchModels(selectedBrand).then((rows) => setModels(rows));
+										}
+									} catch (error) {
+										setMessage(`Assign error: ${error}`);
+									}
+								}}
+							>
+								Assign
+							</button>
 						</div>
 					</div>
 				</div>
