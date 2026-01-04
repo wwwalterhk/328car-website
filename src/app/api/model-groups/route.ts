@@ -124,3 +124,56 @@ export async function PATCH(request: NextRequest) {
 		return NextResponse.json({ error: "Failed to assign model group", details: `${error}` }, { status: 500 });
 	}
 }
+
+export async function PUT(request: NextRequest) {
+	const contentType = request.headers.get("content-type") || "";
+	if (!contentType.includes("application/json")) {
+		return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 415 });
+	}
+
+	let payload: unknown;
+	try {
+		payload = await request.json();
+	} catch (error) {
+		return NextResponse.json({ error: "Invalid JSON body", details: `${error}` }, { status: 400 });
+	}
+
+	const record = (payload ?? {}) as {
+		model_groups_pk?: unknown;
+		group_name?: unknown;
+		heading?: unknown;
+		subheading?: unknown;
+		summary?: unknown;
+	};
+
+	const pk = typeof record.model_groups_pk === "number" ? record.model_groups_pk : Number(record.model_groups_pk);
+	if (!pk || !Number.isFinite(pk)) {
+		return NextResponse.json({ error: "model_groups_pk is required" }, { status: 400 });
+	}
+
+	const groupName = typeof record.group_name === "string" ? record.group_name.trim() : null;
+	const heading = typeof record.heading === "string" ? record.heading.trim() : null;
+	const subheading = typeof record.subheading === "string" ? record.subheading.trim() : null;
+	const summary = typeof record.summary === "string" ? record.summary.trim() : null;
+
+	const { env } = await getCloudflareContext({ async: true });
+	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
+	if (!db) return NextResponse.json({ error: 'Missing binding "DB"' }, { status: 500 });
+
+	try {
+		const result = await db
+			.prepare(
+				`UPDATE model_groups
+         SET group_name = COALESCE(?, group_name),
+             heading = ?,
+             subheading = ?,
+             summary = ?
+         WHERE model_groups_pk = ?`
+			)
+			.bind(groupName, heading, subheading, summary, pk)
+			.run();
+		return NextResponse.json({ ok: true, updated: result.meta?.changes ?? 0 });
+	} catch (error) {
+		return NextResponse.json({ error: "Failed to update model group", details: `${error}` }, { status: 500 });
+	}
+}

@@ -1,5 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import BrandLogo from "@/app/components/brand-logo";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ type ModelRow = {
 	group_name: string | null;
 	group_heading: string | null;
 	group_subheading: string | null;
+	group_summary: string | null;
 };
 
 async function loadBrandIntro(brandSlug: string, locale: string): Promise<string | null> {
@@ -97,7 +99,8 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         m.model_groups_pk,
         g.group_name,
         g.heading AS group_heading,
-        g.subheading AS group_subheading
+        g.subheading AS group_subheading,
+        g.summary AS group_summary
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -125,6 +128,9 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 		loadBrandStory(brand, "zh_hk"),
 		loadBrandHero(brand),
 	]);
+	if (!models.length) {
+		notFound();
+	}
 	const brandTitle = models[0]?.name_zh_hk || models[0]?.name_en || brand;
 	const totalListings = models.reduce((acc, m) => acc + (m.listing_count || 0), 0);
 	const introText =
@@ -233,7 +239,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 
 				<div className="space-y-6">
 					{Array.from(grouped.entries()).map(([pk, group]) => (
-						<div key={pk} className="space-y-3 rounded-3xl border p-4 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.55)] theme-surface">
+						<div key={pk} className="space-y-2">
 							<div className="flex flex-col gap-1">
 								<div className="text-xs uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-300">
 									{group.name || "Model group"}
@@ -244,8 +250,11 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 								{group.subheading ? (
 									<div className="text-sm text-slate-600 dark:text-slate-200">{group.subheading}</div>
 								) : null}
+								{group.items[0]?.group_summary ? (
+									<div className="text-sm text-slate-600 dark:text-slate-200">{group.items[0].group_summary}</div>
+								) : null}
 							</div>
-							<div className="grid gap-3 sm:grid-cols-2">
+							<div className="grid gap-4 sm:grid-cols-2">
 								{group.items.map((model) => {
 									const name = model.model_name || model.model_name_slug || "Unknown model";
 									const yearText =

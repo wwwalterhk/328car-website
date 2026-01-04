@@ -157,7 +157,10 @@ export default async function Home() {
 		loadClassicModelsSummary(),
 		loadBrands(),
 	]);
-	const totalModels = electricModels.length + traditionalModels.length + classicModels.length;
+	const electricTop = electricModels.slice(0, 12);
+	const traditionalTop = traditionalModels.slice(0, 12);
+	const classicTop = classicModels.slice(0, 12);
+	const totalModels = electricTop.length + traditionalTop.length + classicTop.length;
 
 	return (
 		<div className="relative min-h-screen px-6 py-12 text-slate-900 sm:px-10 lg:px-16">
@@ -199,7 +202,7 @@ export default async function Home() {
 						</p>
 					</div>
 					<div className="grid gap-4 md:grid-cols-3 electric-car-list">
-					{electricModels.map((model) => {
+					{electricTop.map((model) => {
 						const modelLabel = model.model_name || "Unknown model";
 						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
 						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
@@ -252,7 +255,7 @@ export default async function Home() {
 					</div>
 				</section>
 
-				{electricModels.length === 0 ? (
+				{electricTop.length === 0 ? (
 					<p className="mt-6 text-sm text-slate-500">
 						No active listings found. Check your D1 data or update schedule.
 					</p>
@@ -266,7 +269,7 @@ export default async function Home() {
 						</p>
 					</div>
 					<div className="grid gap-4 md:grid-cols-3 traditional-car-list">
-					{traditionalModels.map((model) => {
+					{traditionalTop.map((model) => {
 						const modelLabel = model.model_name || "Unknown model";
 						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
 						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
@@ -319,7 +322,7 @@ export default async function Home() {
 					</div>
 				</section>
 
-				{traditionalModels.length === 0 ? (
+				{traditionalTop.length === 0 ? (
 					<p className="mt-6 text-sm text-slate-500">
 						No active traditional listings found. Check your D1 data or update schedule.
 					</p>
@@ -333,7 +336,7 @@ export default async function Home() {
 						</p>
 					</div>
 					<div className="grid gap-4 md:grid-cols-3 classic-car-list">
-					{classicModels.map((model) => {
+					{classicTop.map((model) => {
 						const modelLabel = model.model_name || "Unknown model";
 						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
 						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
@@ -386,7 +389,7 @@ export default async function Home() {
 					</div>
 				</section>
 
-				{classicModels.length === 0 ? (
+				{classicTop.length === 0 ? (
 					<p className="mt-6 text-sm text-slate-500">
 						No classic listings found. Check your D1 data or update schedule.
 					</p>

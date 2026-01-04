@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 type Brand = { slug: string; name_en: string | null; name_zh_hk: string | null };
-type GroupOption = { pk: number; slug: string; name: string };
+type GroupOption = { pk: number; slug: string; name: string; heading?: string | null; subheading?: string | null; summary?: string | null };
 type ModelRow = {
 	model_pk: number;
 	model_name: string | null;
@@ -54,6 +54,9 @@ export default function ModelMergeAdminPage() {
 	const [groupOptions, setGroupOptions] = useState<GroupOption[]>([]);
 	const [assignModalOpen, setAssignModalOpen] = useState(false);
 	const [assignGroupPk, setAssignGroupPk] = useState<number | null>(null);
+	const [editModalOpen, setEditModalOpen] = useState(false);
+	const [editGroupPk, setEditGroupPk] = useState<number | null>(null);
+	const [editForm, setEditForm] = useState({ group_name: "", heading: "", subheading: "", summary: "" });
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
@@ -83,6 +86,9 @@ export default function ModelMergeAdminPage() {
 						pk: Number(g.model_groups_pk) || 0,
 						slug: g.group_slug || "",
 						name: g.group_name || g.group_slug || "",
+						heading: (g as { heading?: string }).heading ?? null,
+						subheading: (g as { subheading?: string }).subheading ?? null,
+						summary: (g as { summary?: string }).summary ?? null,
 					})) ?? [];
 				setGroupOptions(opts.filter((g) => g.pk > 0));
 			})
@@ -170,8 +176,29 @@ export default function ModelMergeAdminPage() {
 						</button>
 						<button
 							type="button"
+							disabled={!selectedBrand || !groupOptions.length}
+							onClick={() => {
+								const first = groupOptions[0];
+								setEditGroupPk(first?.pk ?? null);
+								setEditForm({
+									group_name: first?.name ?? "",
+									heading: first?.heading ?? "",
+									subheading: first?.subheading ?? "",
+									summary: first?.summary ?? "",
+								});
+								setEditModalOpen(true);
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+						>
+							Edit group
+						</button>
+						<button
+							type="button"
 							disabled={mergePks.size === 0}
-							onClick={() => setMergePks(new Set())}
+							onClick={() => {
+								setMergePks(new Set());
+								setTargetPk(null);
+							}}
 							className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 						>
 							Deselect all
@@ -615,6 +642,144 @@ export default function ModelMergeAdminPage() {
 								}}
 							>
 								Assign
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
+
+			{editModalOpen ? (
+				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-md space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<div className="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
+									Edit model group
+								</div>
+								<div className="text-base font-semibold text-slate-800 dark:text-slate-100">Brand: {selectedBrand}</div>
+							</div>
+							<button
+								type="button"
+								className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+								onClick={() => setEditModalOpen(false)}
+								aria-label="Close"
+							>
+								×
+							</button>
+						</div>
+						<div className="space-y-3">
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Select group</label>
+								<select
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={editGroupPk ?? ""}
+									onChange={(e) => {
+										const pk = e.target.value ? Number(e.target.value) : null;
+										setEditGroupPk(pk);
+										const selected = groupOptions.find((g) => g.pk === pk);
+										setEditForm({
+											group_name: selected?.name ?? "",
+											heading: selected?.heading ?? "",
+											subheading: selected?.subheading ?? "",
+											summary: selected?.summary ?? "",
+										});
+									}}
+								>
+									<option value="">Select group</option>
+									{groupOptions.map((g) => (
+										<option key={g.pk} value={g.pk}>
+											{g.name}
+										</option>
+									))}
+								</select>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Group name</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={editForm.group_name}
+									onChange={(e) => setEditForm((prev) => ({ ...prev, group_name: e.target.value }))}
+								/>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Heading</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={editForm.heading}
+									onChange={(e) => setEditForm((prev) => ({ ...prev, heading: e.target.value }))}
+								/>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Subheading</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={editForm.subheading}
+									onChange={(e) => setEditForm((prev) => ({ ...prev, subheading: e.target.value }))}
+								/>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Summary</label>
+								<textarea
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									rows={3}
+									value={editForm.summary}
+									onChange={(e) => setEditForm((prev) => ({ ...prev, summary: e.target.value }))}
+								/>
+							</div>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+								onClick={() => setEditModalOpen(false)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="rounded-lg border border-emerald-500 bg-emerald-500 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-600 dark:bg-emerald-600 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+								disabled={!editGroupPk}
+								onClick={async () => {
+									if (!editGroupPk) return;
+									try {
+										const res = await fetch("/api/model-groups", {
+											method: "PUT",
+											headers: { "content-type": "application/json" },
+											body: JSON.stringify({ model_groups_pk: editGroupPk, ...editForm }),
+										});
+										if (!res.ok) {
+											setMessage("Failed to update group");
+											return;
+										}
+										setMessage("Group updated");
+										setEditModalOpen(false);
+										// refresh groups list
+										if (selectedBrand) {
+											fetch(`/api/model-groups?brand=${encodeURIComponent(selectedBrand)}`, { cache: "no-store" })
+												.then((res) => (res.ok ? res.json() : Promise.reject()))
+												.then((data: unknown) => {
+													const groups = (data as {
+														groups?: Array<{ model_groups_pk?: number; group_slug?: string; group_name?: string; heading?: string; subheading?: string; summary?: string }>;
+													}).groups;
+													const opts: GroupOption[] =
+														groups?.map((g) => ({
+															pk: Number(g.model_groups_pk) || 0,
+															slug: g.group_slug || "",
+															name: g.group_name || g.group_slug || "",
+															heading: g.heading ?? null,
+															subheading: g.subheading ?? null,
+															summary: g.summary ?? null,
+														})) ?? [];
+													setGroupOptions(opts.filter((g) => g.pk > 0));
+												})
+												.catch(() => setGroupOptions([]));
+										}
+									} catch (error) {
+										setMessage(`Update error: ${error}`);
+									}
+								}}
+							>
+								Save changes
 							</button>
 						</div>
 					</div>
