@@ -176,17 +176,15 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 						</div>
 					) : null}
 					<div className="grid gap-4">
-						{models.length > 6 ? (
-							<div className="rounded-3xl border p-5 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.5)] theme-surface">
-								<div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-500">
-									<span className="h-[1px] w-6 bg-slate-300" aria-hidden />
-									Brand story
-								</div>
-								<p className="mt-3 text-sm text-slate-700 brand-story dark:text-slate-100">
-									{storyText}
-								</p>
+						<div className="rounded-3xl border p-5 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.5)] theme-surface">
+							<div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-500">
+								<span className="h-[1px] w-6 bg-slate-300" aria-hidden />
+								Brand story
 							</div>
-						) : null}
+							<p className="mt-3 text-sm text-slate-700 brand-story dark:text-slate-100">
+								{storyText}
+							</p>
+						</div>
 					</div>
 				</div>
 

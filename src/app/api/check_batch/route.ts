@@ -31,6 +31,7 @@ SELECT batch_id, status, submitted_at, completed_at, failed_at, updated_at, erro
 FROM chatgpt_batches
 WHERE completed_at IS NULL
   AND failed_at IS NULL
+  AND (batch_id NOT LIKE 'brand_content::%' AND batch_id LIKE 'batch_%')
 ORDER BY submitted_at DESC
 LIMIT 100
 `;
@@ -270,6 +271,17 @@ async function processBatchFiles(
 				const [site, ...rest] = customId.split("-");
 				const listingId = rest.join("-") || null;
 
+				const itemRow = await db
+					.prepare(
+						`SELECT listing_pk
+             FROM chatgpt_batch_items
+             WHERE batch_id = ? AND site = ? AND listing_id = ?
+             LIMIT 1`
+					)
+					.bind(batchId, site, listingId)
+					.first<{ listing_pk: number | null }>();
+				const hasListingPk = itemRow?.listing_pk != null;
+
 				await db
 					.prepare(
 						`UPDATE chatgpt_batch_items
@@ -288,7 +300,7 @@ async function processBatchFiles(
 						statusCode && statusCode >= 200 && statusCode < 300
 							? extractOutputTextFromResponseBody(responseBody)
 							: null;
-					if (outputText) {
+					if (outputText && hasListingPk) {
 						const parsed = safeJsonParse<unknown>(outputText);
 						if (parsed) {
 							await applyModelOutput(db, parsed);
