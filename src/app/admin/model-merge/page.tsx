@@ -14,6 +14,7 @@ type ModelRow = {
 	engine_cc: string | null;
 	power_kw: string | null;
 	facelift: string | null;
+	listing_count: number;
 };
 
 async function fetchBrands(): Promise<Brand[]> {
@@ -36,6 +37,7 @@ export default function ModelMergeAdminPage() {
 	const [models, setModels] = useState<ModelRow[]>([]);
 	const [targetPk, setTargetPk] = useState<number | null>(null);
 	const [mergePks, setMergePks] = useState<Set<number>>(new Set());
+	const [message, setMessage] = useState<string | null>(null);
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
@@ -74,7 +76,7 @@ export default function ModelMergeAdminPage() {
 	};
 
 	return (
-		<div className="relative min-h-screen px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+		<div className="relative min-h-screen px-4 py-8 text-slate-900 sm:px-8 lg:px-12">
 			<div
 				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
@@ -82,18 +84,18 @@ export default function ModelMergeAdminPage() {
 					backgroundImage: "var(--page-bg-gradient)",
 				}}
 			/>
-			<div className="mx-auto max-w-6xl space-y-6">
+			<div className="mx-auto max-w-6xl space-y-5 text-[13px] sm:text-sm">
 				<div className="space-y-2">
-					<h1 className="text-3xl font-semibold text-slate-900">Model merge (draft)</h1>
-					<p className="text-sm text-slate-600">
+					<h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Model merge (draft)</h1>
+					<p className="text-[13px] text-slate-600 dark:text-slate-200">
 						Select a brand, choose one target model and multiple rows to merge into it.
 					</p>
 				</div>
 
-				<div className="rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] theme-surface space-y-3">
-					<label className="text-sm font-semibold text-slate-700">Brand</label>
+				<div className="rounded-2xl border p-3 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] theme-surface space-y-3">
+					<label className="text-[13px] font-semibold text-slate-700 dark:text-slate-100">Brand</label>
 					<select
-						className="w-full rounded-lg border px-3 py-2 text-sm theme-surface"
+						className="w-full rounded-lg border px-3 py-2 text-[13px] sm:text-sm theme-surface"
 						value={selectedBrand}
 						onChange={(e) => setSelectedBrand(e.target.value)}
 					>
@@ -107,8 +109,8 @@ export default function ModelMergeAdminPage() {
 				</div>
 
 				<div className="overflow-auto rounded-2xl border shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] theme-surface">
-					<table className="min-w-full border-collapse text-sm">
-						<thead className="bg-slate-50 text-slate-600">
+					<table className="min-w-full border-collapse text-[12px] sm:text-[13px]">
+						<thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-50">
 							<tr>
 								<th className="border-b px-3 py-2 text-left">Merge?</th>
 								<th className="border-b px-3 py-2 text-left">Target</th>
@@ -120,6 +122,8 @@ export default function ModelMergeAdminPage() {
 								<th className="border-b px-3 py-2 text-left">power</th>
 								<th className="border-b px-3 py-2 text-left">engine_cc / power_kw</th>
 								<th className="border-b px-3 py-2 text-left">facelift</th>
+								<th className="border-b px-3 py-2 text-left">listings</th>
+								<th className="border-b px-3 py-2 text-left">Copy</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -127,7 +131,7 @@ export default function ModelMergeAdminPage() {
 								const checked = mergePks.has(m.model_pk);
 								return (
 									<tr key={m.model_pk} className="border-b last:border-b-0">
-										<td className="px-3 py-2">
+										<td className="px-2 py-1.5">
 											<input
 												type="checkbox"
 												checked={checked}
@@ -135,7 +139,7 @@ export default function ModelMergeAdminPage() {
 												className="h-4 w-4"
 											/>
 										</td>
-										<td className="px-3 py-2">
+										<td className="px-2 py-1.5">
 											<input
 												type="radio"
 												name="target"
@@ -144,22 +148,36 @@ export default function ModelMergeAdminPage() {
 												className="h-4 w-4"
 											/>
 										</td>
-										<td className="px-3 py-2 text-slate-900">{m.model_name || "—"}</td>
-										<td className="px-3 py-2 text-slate-700">{m.model_name_slug || "—"}</td>
-										<td className="px-3 py-2 text-slate-700">{m.model_slug || "—"}</td>
-										<td className="px-3 py-2 text-slate-700">{m.manu_model_code || "—"}</td>
-										<td className="px-3 py-2 text-slate-700">{m.body_type || "—"}</td>
-										<td className="px-3 py-2 text-slate-700">{m.power || "—"}</td>
-										<td className="px-3 py-2 text-slate-700">
+										<td className="px-2 py-1.5 text-slate-900 dark:text-slate-50">{m.model_name || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.model_name_slug || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.model_slug || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.manu_model_code || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.body_type || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.power || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">
 											{m.power && m.power.toLowerCase() === "electric" ? m.power_kw || "—" : m.engine_cc || "—"}
 										</td>
-										<td className="px-3 py-2 text-slate-700">{m.facelift || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.facelift || "—"}</td>
+										<td className="px-2 py-1.5 text-slate-700 dark:text-slate-100">{m.listing_count ?? 0}</td>
+										<td className="px-2 py-1.5">
+											<button
+												type="button"
+												className="rounded border px-2 py-1 text-[11px] text-slate-700 hover:-translate-y-0.5 hover:shadow"
+												onClick={() => {
+													const rowJson = JSON.stringify(m, null, 2);
+													void navigator.clipboard.writeText(rowJson);
+													setMessage("Copied row to clipboard");
+												}}
+											>
+												Copy
+											</button>
+										</td>
 									</tr>
 								);
 							})}
 							{!models.length ? (
 								<tr>
-									<td colSpan={10} className="px-3 py-4 text-center text-sm text-slate-500">
+									<td colSpan={12} className="px-3 py-4 text-center text-sm text-slate-500">
 										No models yet for this brand.
 									</td>
 								</tr>
@@ -169,9 +187,11 @@ export default function ModelMergeAdminPage() {
 				</div>
 
 				<div className="flex items-center gap-3 text-xs text-slate-600">
-					<div className="rounded-full bg-slate-100 px-3 py-1">Target: {targetPk ?? "none"}</div>
-					<div className="rounded-full bg-slate-100 px-3 py-1">Merge count: {mergePks.size}</div>
+					<div className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-700 dark:text-slate-50">Target: {targetPk ?? "none"}</div>
+					<div className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-700 dark:text-slate-50">Merge count: {mergePks.size}</div>
 				</div>
+
+				{message ? <div className="text-xs text-slate-600 dark:text-slate-200">{message}</div> : null}
 			</div>
 		</div>
 	);

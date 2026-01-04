@@ -53,34 +53,10 @@ INSERT INTO car_listings (
   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(site, id) DO UPDATE SET
-  url = excluded.url,
-  title = excluded.title,
   price = excluded.price,
   discount_price = excluded.discount_price,
-  year = excluded.year,
-  mileage_km = excluded.mileage_km,
-  engine_cc = excluded.engine_cc,
-  transmission = excluded.transmission,
-  fuel = excluded.fuel,
-  brand = excluded.brand,
-  brand_slug = excluded.brand_slug,
-  model = excluded.model,
-  model_pk = excluded.model_pk,
-  model_sts = excluded.model_sts,
-  seats = excluded.seats,
-  color = excluded.color,
-  licence_expiry = excluded.licence_expiry,
-  body_type = excluded.body_type,
-  first_registration_count = excluded.first_registration_count,
-  seller_name = excluded.seller_name,
-  seller_phone = excluded.seller_phone,
-  contact = excluded.contact,
-  summary = excluded.summary,
-  remark = excluded.remark,
-  photos = excluded.photos,
-  last_update_datetime = excluded.last_update_datetime,
-  vehicle_type = excluded.vehicle_type,
-  sold = excluded.sold
+  sold = excluded.sold,
+  last_update_datetime = excluded.last_update_datetime
 `;
 
 const SELECT_PENDING_SQL = `

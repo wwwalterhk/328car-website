@@ -301,9 +301,16 @@ async function processBatchFiles(
 							? extractOutputTextFromResponseBody(responseBody)
 							: null;
 					if (outputText && hasListingPk) {
-						const parsed = safeJsonParse<unknown>(outputText);
-						if (parsed) {
-							await applyModelOutput(db, parsed);
+						// Only process when listing model_sts is NULL
+						const listingModel = await db
+							.prepare("SELECT model_sts FROM car_listings WHERE site = ? AND id = ? LIMIT 1")
+							.bind(site, listingId)
+							.first<{ model_sts: number | null }>();
+						if (listingModel?.model_sts === null) {
+							const parsed = safeJsonParse<unknown>(outputText);
+							if (parsed) {
+								await applyModelOutput(db, parsed);
+							}
 						}
 					}
 				}
@@ -454,22 +461,22 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 		db
 			.prepare(
 				`UPDATE car_listings
-         SET model_pk = (
-           SELECT model_pk
-           FROM models
-           WHERE brand_slug = ?
-             AND (
-               (? IS NOT NULL AND model_slug = ?)
-               OR (? IS NULL AND manu_model_code IS ? AND model_name IS ?)
-             )
-           ORDER BY model_pk DESC
-           LIMIT 1
-         ),
-         model_sts = 1,
-         manu_color_name = ?,
-         gen_color_name = ?,
-         gen_color_code = ?
-         WHERE site = ? AND id = ?`
+					SET model_pk = (
+					SELECT model_pk
+					FROM models
+					WHERE brand_slug = ?
+						AND (
+						(? IS NOT NULL AND model_slug = ?)
+						OR (? IS NULL AND manu_model_code IS ? AND model_name IS ?)
+						)
+					ORDER BY model_pk DESC
+					LIMIT 1
+					),
+					model_sts = 1,
+					manu_color_name = ?,
+					gen_color_name = ?,
+					gen_color_code = ?
+				WHERE model_sts is null AND site = ? AND id = ?`
 			)
 			.bind(
 				brandSlug,

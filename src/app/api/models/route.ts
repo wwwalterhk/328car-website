@@ -12,6 +12,7 @@ type ModelRow = {
 	engine_cc: string | null;
 	power_kw: string | null;
 	facelift: string | null;
+	listing_count: number;
 };
 
 export async function GET(request: NextRequest) {
@@ -29,10 +30,25 @@ export async function GET(request: NextRequest) {
 
 	const result = await db
 		.prepare(
-			`SELECT model_pk, model_name, model_name_slug, model_slug, manu_model_code, body_type, power, engine_cc, power_kw, facelift
-       FROM models
-       WHERE brand_slug = ?
-       ORDER BY model_name_slug IS NULL, model_name_slug, model_slug`
+			`SELECT
+         m.model_pk,
+         m.model_name,
+         m.model_name_slug,
+         m.model_slug,
+         m.manu_model_code,
+         m.body_type,
+         m.power,
+         m.engine_cc,
+         m.power_kw,
+         m.facelift,
+         COUNT(c.listing_pk) AS listing_count
+       FROM models m
+       LEFT JOIN car_listings c ON c.model_pk = m.model_pk
+       WHERE m.brand_slug = ?
+       GROUP BY
+         m.model_pk, m.model_name, m.model_name_slug, m.model_slug,
+         m.manu_model_code, m.body_type, m.power, m.engine_cc, m.power_kw, m.facelift
+       ORDER BY m.model_name_slug IS NULL, m.model_name_slug, m.model_slug`
 		)
 		.bind(brand)
 		.all<ModelRow>();

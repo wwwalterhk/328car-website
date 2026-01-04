@@ -376,6 +376,15 @@ CREATE TABLE IF NOT EXISTS car_listings_log (
 CREATE TRIGGER IF NOT EXISTS trg_car_listings_update_log
 AFTER UPDATE ON car_listings
 FOR EACH ROW
+WHEN
+  COALESCE(OLD.price, -1)               != COALESCE(NEW.price, -1) OR
+  COALESCE(OLD.discount_price, -1)      != COALESCE(NEW.discount_price, -1) OR
+  COALESCE(OLD.sold, -1)                != COALESCE(NEW.sold, -1) OR
+  COALESCE(OLD.brand_slug, '')          != COALESCE(NEW.brand_slug, '') OR
+  COALESCE(OLD.model_pk, -1)            != COALESCE(NEW.model_pk, -1) OR
+  COALESCE(OLD.model_sts, -1)           != COALESCE(NEW.model_sts, -1) OR
+  COALESCE(OLD.model, '')               != COALESCE(NEW.model, '') OR
+  COALESCE(OLD.last_update_datetime,'') != COALESCE(NEW.last_update_datetime,'')
 BEGIN
   INSERT INTO car_listings_log (
     listing_pk, site, id, action, price, discount_price, sold, brand_slug, model_pk, model_sts, model, last_update_datetime
