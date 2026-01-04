@@ -168,6 +168,14 @@ export default function ModelMergeAdminPage() {
 						>
 							Assign group
 						</button>
+						<button
+							type="button"
+							disabled={mergePks.size === 0}
+							onClick={() => setMergePks(new Set())}
+							className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+						>
+							Deselect all
+						</button>
 					</div>
 				</div>
 

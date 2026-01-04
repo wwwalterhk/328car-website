@@ -13,6 +13,10 @@ type ModelRow = {
 	model_name_slug: string | null;
 	min_year: number | null;
 	max_year: number | null;
+	model_groups_pk: number | null;
+	group_name: string | null;
+	group_heading: string | null;
+	group_subheading: string | null;
 };
 
 async function loadBrandIntro(brandSlug: string, locale: string): Promise<string | null> {
@@ -89,10 +93,15 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         b.slug AS brand_slug,
         m.model_name_slug,
         MIN(c.year) AS min_year,
-        MAX(c.year) AS max_year
+        MAX(c.year) AS max_year,
+        m.model_groups_pk,
+        g.group_name,
+        g.heading AS group_heading,
+        g.subheading AS group_subheading
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
+      LEFT JOIN model_groups g ON m.model_groups_pk = g.model_groups_pk
       WHERE
         c.sts = 1
         AND c.model_sts = 1
@@ -100,7 +109,7 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         AND b.slug = ?
       GROUP BY
         m.model_name_slug
-      ORDER BY listing_count DESC`
+      ORDER BY (m.model_groups_pk IS NULL), g.group_name, listing_count DESC`
 		)
 		.bind(brandSlug)
 		.all<ModelRow>();
@@ -125,6 +134,33 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 		story ||
 		"Add a brand story here. Lead with design/aesthetics, mention hero models, and close with a note on tech/EV direction.";
 	const heroImage = hero || null;
+
+	const grouped = new Map<
+		number,
+		{
+			name: string | null;
+			heading: string | null;
+			subheading: string | null;
+			items: ModelRow[];
+		}
+	>();
+	const ungrouped: ModelRow[] = [];
+
+	for (const model of models) {
+		if (model.model_groups_pk != null) {
+			if (!grouped.has(model.model_groups_pk)) {
+				grouped.set(model.model_groups_pk, {
+					name: model.group_name,
+					heading: model.group_heading,
+					subheading: model.group_subheading,
+					items: [],
+				});
+			}
+			grouped.get(model.model_groups_pk)!.items.push(model);
+		} else {
+			ungrouped.push(model);
+		}
+	}
 
 	return (
 		<div className="relative min-h-screen px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
@@ -195,44 +231,105 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 					Models in stock
 				</div>
 
-				<div className="grid gap-4 sm:grid-cols-2">
-					{models.map((model) => {
-						const name = model.model_name || model.model_name_slug || "Unknown model";
-						const yearText =
-							model.min_year && model.max_year
-								? model.min_year === model.max_year
-									? `${model.min_year}`
-									: `${model.min_year}–${model.max_year}`
-								: "Years N/A";
-						const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
+				<div className="space-y-6">
+					{Array.from(grouped.entries()).map(([pk, group]) => (
+						<div key={pk} className="space-y-3 rounded-3xl border p-4 shadow-[0_14px_30px_-26px_rgba(15,23,42,0.55)] theme-surface">
+							<div className="flex flex-col gap-1">
+								<div className="text-xs uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-300">
+									{group.name || "Model group"}
+								</div>
+								{group.heading ? (
+									<div className="text-lg font-semibold text-slate-900 dark:text-slate-50">{group.heading}</div>
+								) : null}
+								{group.subheading ? (
+									<div className="text-sm text-slate-600 dark:text-slate-200">{group.subheading}</div>
+								) : null}
+							</div>
+							<div className="grid gap-3 sm:grid-cols-2">
+								{group.items.map((model) => {
+									const name = model.model_name || model.model_name_slug || "Unknown model";
+									const yearText =
+										model.min_year && model.max_year
+											? model.min_year === model.max_year
+												? `${model.min_year}`
+												: `${model.min_year}–${model.max_year}`
+											: "Years N/A";
+									const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
+									return (
+										<Link
+											key={`${pk}-${model.model_name_slug ?? name}`}
+											href={href}
+											className="group flex items-center justify-between rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] theme-surface"
+										>
+											<div className="min-w-0">
+												<div className="text-xs uppercase tracking-[0.2em] text-slate-400">{model.brand_slug}</div>
+												<div className="text-lg font-semibold text-slate-900">{name}</div>
+												<div className="text-xs text-slate-500">
+													{model.model_name_slug} · {yearText}
+												</div>
+											</div>
+											<div
+												className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
+												style={{
+													backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+													color: "var(--background)",
+													border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+												}}
+											>
+												{model.listing_count}
+											</div>
+										</Link>
+									);
+								})}
+							</div>
+						</div>
+					))}
 
-						return (
-							<Link
-								key={model.model_name_slug ?? name}
-								href={href}
-								className="group flex items-center justify-between rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] theme-surface"
-							>
-								<div className="min-w-0">
-									<div className="text-xs uppercase tracking-[0.2em] text-slate-400">
-										{model.brand_slug}
-									</div>
-									<div className="text-lg font-semibold text-slate-900">{name}</div>
-									<div className="text-xs text-slate-500">
-										{model.model_name_slug} · {yearText}
-									</div>
-								</div>
-								<div className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
-									style={{
-										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
-										color: "var(--background)",
-										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
-									}}
-								>
-									{model.listing_count}
-								</div>
-							</Link>
-						);
-					})}
+					{ungrouped.length ? (
+						<div className="space-y-3">
+							<div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-500">
+								<span className="h-[1px] w-6 bg-slate-300" aria-hidden />
+								Other models
+							</div>
+							<div className="grid gap-4 sm:grid-cols-2">
+								{ungrouped.map((model) => {
+									const name = model.model_name || model.model_name_slug || "Unknown model";
+									const yearText =
+										model.min_year && model.max_year
+											? model.min_year === model.max_year
+												? `${model.min_year}`
+												: `${model.min_year}–${model.max_year}`
+											: "Years N/A";
+									const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
+									return (
+										<Link
+											key={model.model_name_slug ?? name}
+											href={href}
+											className="group flex items-center justify-between rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] theme-surface"
+										>
+											<div className="min-w-0">
+												<div className="text-xs uppercase tracking-[0.2em] text-slate-400">{model.brand_slug}</div>
+												<div className="text-lg font-semibold text-slate-900">{name}</div>
+												<div className="text-xs text-slate-500">
+													{model.model_name_slug} · {yearText}
+												</div>
+											</div>
+											<div
+												className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
+												style={{
+													backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
+													color: "var(--background)",
+													border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
+												}}
+											>
+												{model.listing_count}
+											</div>
+										</Link>
+									);
+								})}
+							</div>
+						</div>
+					) : null}
 				</div>
 
 				{models.length === 0 ? (
