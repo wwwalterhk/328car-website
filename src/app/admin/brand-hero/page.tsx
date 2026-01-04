@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Brand = { slug: string; name_en: string | null; name_zh_hk: string | null; hero_path: string | null };
+type Hero = { locale: string | null; path: string | null; url: string | null };
 
 async function fetchBrands(): Promise<Brand[]> {
 	const res = await fetch("/api/brands/list", { cache: "no-store" });
@@ -14,7 +15,7 @@ async function fetchBrands(): Promise<Brand[]> {
 export default function BrandHeroAdminPage() {
 	const [brands, setBrands] = useState<Brand[]>([]);
 	const [selected, setSelected] = useState<string>("");
-	const [heroUrl, setHeroUrl] = useState<string | null>(null);
+	const [heroes, setHeroes] = useState<Hero[]>([]);
 	const [message, setMessage] = useState<string | null>(null);
 	const [uploading, setUploading] = useState(false);
 
@@ -25,14 +26,16 @@ export default function BrandHeroAdminPage() {
 	useEffect(() => {
 		const brand = brands.find((b) => b.slug === selected);
 		if (!brand) {
-			setHeroUrl(null);
+			setHeroes([]);
 			return;
 		}
-		if (brand.hero_path) {
-			setHeroUrl(brand.hero_path.startsWith("http") ? brand.hero_path : `https://cdn.328car.com${brand.hero_path}`);
-		} else {
-			setHeroUrl(null);
-		}
+		fetch(`/api/brands/hero?brand=${brand.slug}`, { cache: "no-store" })
+			.then(async (res) => (res.ok ? ((await res.json()) as { heroes?: Hero[] }) : Promise.reject()))
+			.then((data) => {
+				const list = Array.isArray(data.heroes) ? data.heroes : [];
+				setHeroes(list);
+			})
+			.catch(() => setHeroes([]));
 	}, [selected, brands]);
 
 	const options = useMemo(
@@ -61,10 +64,10 @@ export default function BrandHeroAdminPage() {
 				setMessage(data.error || "Upload failed");
 			} else {
 				setMessage("Hero updated");
-				setHeroUrl(data.url || data.path || null);
-				setBrands((prev) =>
-					prev.map((b) => (b.slug === selected ? { ...b, hero_path: data.path || b.hero_path } : b))
-				);
+				// refresh list
+				const res = await fetch(`/api/brands/hero?brand=${selected}`, { cache: "no-store" });
+				const refreshed = (await res.json()) as { heroes?: Hero[] };
+				setHeroes(Array.isArray(refreshed.heroes) ? refreshed.heroes : []);
 			}
 		} catch (error) {
 			setMessage(`Upload error: ${error}`);
@@ -74,17 +77,24 @@ export default function BrandHeroAdminPage() {
 	};
 
 	return (
-		<div className="min-h-screen bg-white px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+		<div className="relative min-h-screen px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+			<div
+				className="pointer-events-none fixed inset-0 -z-10"
+				style={{
+					backgroundColor: "var(--background)",
+					backgroundImage: "var(--page-bg-gradient)",
+				}}
+			/>
 			<div className="mx-auto max-w-3xl space-y-6">
 				<div className="space-y-2">
 					<h1 className="text-3xl font-semibold text-slate-900">Brand hero upload</h1>
 					<p className="text-sm text-slate-600">Select a brand, view current hero, and upload a new image.</p>
 				</div>
 
-				<div className="space-y-4 rounded-2xl border p-4 shadow-sm">
+				<div className="space-y-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] theme-surface">
 					<label className="text-sm font-semibold text-slate-700">Brand</label>
 					<select
-						className="w-full rounded-lg border px-3 py-2 text-sm"
+						className="w-full rounded-lg border px-3 py-2 text-sm theme-surface"
 						value={selected}
 						onChange={(e) => setSelected(e.target.value)}
 					>
@@ -97,9 +107,55 @@ export default function BrandHeroAdminPage() {
 					</select>
 
 					<div className="space-y-2">
-						<div className="text-sm font-semibold text-slate-700">Current hero</div>
-						{heroUrl ? (
-							<img src={heroUrl} alt="Brand hero" className="h-48 w-full rounded-lg object-cover" />
+						<div className="text-sm font-semibold text-slate-700">Current heroes</div>
+						{heroes.length ? (
+							<div className="grid gap-3 sm:grid-cols-2">
+								{heroes.map((h) => (
+									<div key={h.locale || h.url || h.path} className="relative overflow-hidden rounded-lg border theme-surface">
+										{h.url ? (
+											// eslint-disable-next-line @next/next/no-img-element
+											<img src={h.url} alt="hero" className="h-32 w-full object-cover" />
+										) : (
+											<div className="h-32 w-full bg-slate-100" />
+										)}
+										<div className="flex items-center justify-between px-3 py-2 text-xs text-slate-700">
+											<span>locale: {h.locale || "n/a"}</span>
+											<button
+												type="button"
+												className="rounded bg-rose-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-rose-700"
+												onClick={async () => {
+													if (!selected || !h.locale) return;
+													setUploading(true);
+													setMessage(null);
+													try {
+														const res = await fetch(
+															`/api/brands/hero?brand=${selected}&locale=${h.locale}`,
+															{ method: "DELETE" }
+														);
+														const data = (await res.json()) as { error?: string };
+														if (!res.ok) {
+															setMessage(data.error || "Delete failed");
+														} else {
+															setMessage("Deleted");
+															const refreshed = await fetch(
+																`/api/brands/hero?brand=${selected}`,
+																{ cache: "no-store" }
+															).then((r) => r.json() as Promise<{ heroes?: Hero[] }>);
+															setHeroes(Array.isArray(refreshed.heroes) ? refreshed.heroes : []);
+														}
+													} catch (error) {
+														setMessage(`Delete error: ${error}`);
+													} finally {
+														setUploading(false);
+													}
+												}}
+											>
+												Delete
+											</button>
+										</div>
+									</div>
+								))}
+							</div>
 						) : (
 							<p className="text-sm text-slate-500">No hero image</p>
 						)}
@@ -107,7 +163,7 @@ export default function BrandHeroAdminPage() {
 
 					<div className="space-y-2">
 						<div className="text-sm font-semibold text-slate-700">Upload new hero</div>
-						<label className="flex h-32 cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-600 transition hover:border-slate-400 hover:bg-slate-100">
+						<label className="flex h-40 cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-600 transition hover:border-slate-400 hover:bg-slate-100">
 							<input
 								type="file"
 								accept="image/jpeg,image/png"

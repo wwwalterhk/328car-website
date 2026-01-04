@@ -61,6 +61,7 @@ async function loadBrandHero(brandSlug: string): Promise<string | null> {
 			`SELECT content
        FROM brands_item
        WHERE brand_slug = ? AND item = 'brand-hero'
+       ORDER BY RANDOM()
        LIMIT 1`
 		)
 		.bind(brandSlug)
@@ -167,6 +168,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 					</div>
 					{heroImage ? (
 						<div className="relative overflow-hidden rounded-3xl border shadow-[0_18px_36px_-28px_rgba(15,23,42,0.7)] theme-surface">
+							{/* eslint-disable-next-line @next/next/no-img-element */}
 							<img
 								src={heroImage}
 								alt={`${brandTitle} hero`}

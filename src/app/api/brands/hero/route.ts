@@ -1,9 +1,9 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextRequest, NextResponse } from "next/server";
 
-type HeroRow = { content: string | null };
-
 const MAX_BYTES = 800_000;
+
+type HeroRow = { locale: string | null; content: string | null };
 
 export async function GET(request: NextRequest) {
 	const { searchParams } = new URL(request.url);
@@ -14,19 +14,28 @@ export async function GET(request: NextRequest) {
 	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
 	if (!db) return NextResponse.json({ error: 'Missing binding "DB"' }, { status: 500 });
 
-	const hero = await db
-		.prepare("SELECT content FROM brands_item WHERE brand_slug = ? AND locale = 'zh_hk' AND item = 'brand-hero' LIMIT 1")
+	const result = await db
+		.prepare(
+			`SELECT locale, content
+       FROM brands_item
+       WHERE brand_slug = ? AND item = 'brand-hero'
+       ORDER BY CAST(locale AS INTEGER) ASC`
+		)
 		.bind(brand)
-		.first<HeroRow>();
+		.all<HeroRow>();
 
-	const path = hero?.content || null;
-	const url = path
-		? path.startsWith("http")
-			? path
-			: `https://cdn.328car.com${path}`
-		: null;
+	const heroes =
+		result.results?.map((row) => {
+			const path = row.content || null;
+			const url = path
+				? path.startsWith("http")
+					? path
+					: `https://cdn.328car.com${path}`
+				: null;
+			return { locale: row.locale, path, url };
+		}) ?? [];
 
-	return NextResponse.json({ ok: true, brand, path, url });
+	return NextResponse.json({ ok: true, brand, heroes });
 }
 
 export async function POST(request: NextRequest) {
@@ -64,7 +73,14 @@ export async function POST(request: NextRequest) {
 	if (!db) return NextResponse.json({ error: 'Missing binding "DB"' }, { status: 500 });
 	if (!r2) return NextResponse.json({ error: 'Missing binding "R2"' }, { status: 500 });
 
-	const key = `brand_heros/${brand}.jpg`;
+	const nextLocaleRow = await db
+		.prepare(`SELECT MAX(CAST(locale AS INTEGER)) AS max_locale FROM brands_item WHERE brand_slug = ? AND item = 'brand-hero'`)
+		.bind(brand)
+		.first<{ max_locale: number | null }>();
+	const nextLocale = (nextLocaleRow?.max_locale ?? 0) + 1;
+	const localeStr = String(nextLocale);
+
+	const key = `brand_heros/${brand}-${localeStr}.jpg`;
 	try {
 		await r2.put(key, buf, { httpMetadata: { contentType: "image/jpeg" } });
 	} catch (error) {
@@ -75,61 +91,55 @@ export async function POST(request: NextRequest) {
 	await db
 		.prepare(
 			`INSERT INTO brands_item (brand_slug, locale, item, item_key, content)
-       VALUES (?, 'zh_hk', 'brand-hero', NULL, ?)
+       VALUES (?, ?, 'brand-hero', NULL, ?)
        ON CONFLICT (brand_slug, locale, item) DO UPDATE SET content = excluded.content`
 		)
-		.bind(brand, path)
+		.bind(brand, localeStr, path)
 		.run();
 
-	return NextResponse.json({ ok: true, brand, path, url: `https://cdn.328car.com${path}` });
+	return NextResponse.json({
+		ok: true,
+		brand,
+		locale: localeStr,
+		path,
+		url: `https://cdn.328car.com${path}`,
+	});
 }
 
-type ImageDimensions = { width: number; height: number; type: "jpeg" | "png" };
+export async function DELETE(request: NextRequest) {
+	const { searchParams } = new URL(request.url);
+	const brand = (searchParams.get("brand") || "").trim();
+	const locale = (searchParams.get("locale") || "").trim();
+	if (!brand || !locale) return NextResponse.json({ error: "brand and locale are required" }, { status: 400 });
 
-function getImageDimensions(data: Uint8Array): ImageDimensions | null {
-	if (isPng(data)) {
-		const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-		const width = view.getUint32(16);
-		const height = view.getUint32(20);
-		return { width, height, type: "png" };
-	}
-	if (isJpeg(data)) {
-		let offset = 2;
-		while (offset + 9 < data.length) {
-			if (data[offset] !== 0xff) break;
-			const marker = data[offset + 1];
-			const length = (data[offset + 2] << 8) + data[offset + 3];
-			if (
-				marker === 0xc0 ||
-				marker === 0xc2 ||
-				marker === 0xc4 ||
-				marker === 0xc1 ||
-				marker === 0xc3
-			) {
-				const height = (data[offset + 5] << 8) + data[offset + 6];
-				const width = (data[offset + 7] << 8) + data[offset + 8];
-				return { width, height, type: "jpeg" };
-			}
-			offset += 2 + length;
+	const { env } = await getCloudflareContext({ async: true });
+	const bindings = env as CloudflareEnv & { DB?: D1Database; R2?: R2Bucket };
+	const db = bindings.DB;
+	const r2 = bindings.R2;
+	if (!db) return NextResponse.json({ error: 'Missing binding "DB"' }, { status: 500 });
+
+	const row = await db
+		.prepare(
+			`SELECT content FROM brands_item WHERE brand_slug = ? AND locale = ? AND item = 'brand-hero' LIMIT 1`
+		)
+		.bind(brand, locale)
+		.first<{ content: string | null }>();
+
+	await db
+		.prepare(
+			`DELETE FROM brands_item WHERE brand_slug = ? AND locale = ? AND item = 'brand-hero'`
+		)
+		.bind(brand, locale)
+		.run();
+
+	if (r2 && row?.content) {
+		const key = row.content.startsWith("/") ? row.content.slice(1) : row.content;
+		try {
+			await r2.delete(key);
+		} catch {
+			// ignore delete failures
 		}
 	}
-	return null;
-}
 
-function isPng(data: Uint8Array): boolean {
-	return (
-		data.length >= 24 &&
-		data[0] === 0x89 &&
-		data[1] === 0x50 &&
-		data[2] === 0x4e &&
-		data[3] === 0x47 &&
-		data[4] === 0x0d &&
-		data[5] === 0x0a &&
-		data[6] === 0x1a &&
-		data[7] === 0x0a
-	);
-}
-
-function isJpeg(data: Uint8Array): boolean {
-	return data.length > 10 && data[0] === 0xff && data[1] === 0xd8;
+	return NextResponse.json({ ok: true, brand, locale });
 }
