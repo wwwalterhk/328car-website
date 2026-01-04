@@ -91,8 +91,8 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         MIN(c.year) AS min_year,
         MAX(c.year) AS max_year
       FROM car_listings c
-      INNER JOIN brands b ON c.brand_slug = b.slug
       INNER JOIN models m ON c.model_pk = m.model_pk
+      INNER JOIN brands b ON m.brand_slug = b.slug
       WHERE
         c.sts = 1
         AND c.model_sts = 1

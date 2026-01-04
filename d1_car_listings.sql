@@ -356,3 +356,38 @@ CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites(user_pk);
 CREATE INDEX IF NOT EXISTS idx_user_inquiries_listing ON user_inquiries(listing_pk);
 
 
+CREATE TABLE IF NOT EXISTS car_listings_log (
+  log_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  listing_pk INTEGER,
+  site TEXT,
+  id TEXT,
+  changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  action TEXT, -- 'old' or 'new'
+  price REAL,
+  discount_price REAL,
+  sold INTEGER,
+  brand_slug TEXT,
+  model_pk INTEGER,
+  model_sts INTEGER,
+  model TEXT,
+  last_update_datetime TEXT
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_car_listings_update_log
+AFTER UPDATE ON car_listings
+FOR EACH ROW
+BEGIN
+  INSERT INTO car_listings_log (
+    listing_pk, site, id, action, price, discount_price, sold, brand_slug, model_pk, model_sts, model, last_update_datetime
+  ) VALUES (
+    OLD.listing_pk, OLD.site, OLD.id, 'old',
+    OLD.price, OLD.discount_price, OLD.sold, OLD.brand_slug, OLD.model_pk, OLD.model_sts, OLD.model, OLD.last_update_datetime
+  );
+
+  INSERT INTO car_listings_log (
+    listing_pk, site, id, action, price, discount_price, sold, brand_slug, model_pk, model_sts, model, last_update_datetime
+  ) VALUES (
+    NEW.listing_pk, NEW.site, NEW.id, 'new',
+    NEW.price, NEW.discount_price, NEW.sold, NEW.brand_slug, NEW.model_pk, NEW.model_sts, NEW.model, NEW.last_update_datetime
+  );
+END;
