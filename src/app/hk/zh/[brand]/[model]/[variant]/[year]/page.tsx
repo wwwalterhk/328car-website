@@ -14,6 +14,7 @@ type CarRow = {
 	price: number | null;
 	discount_price: number | null;
 	url: string;
+	id?: string | null;
 	sold: number | null;
 	gen_color_name: string | null;
 	gen_color_code: string | null;
@@ -53,10 +54,11 @@ async function loadCars(
         c.manu_color_name,
         c.transmission,
         c.mileage_km,
-        c.site
+        c.site,
+        c.id
       FROM car_listings c
-      INNER JOIN brands b ON c.brand_slug = b.slug
       INNER JOIN models m ON c.model_pk = m.model_pk
+      INNER JOIN brands b ON m.brand_slug = b.slug
       WHERE
         c.sts = 1
         AND c.model_sts = 1
@@ -149,27 +151,53 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 
 				<div className="grid gap-4 sm:grid-cols-2">
 					{cars.map((car, idx) => {
-						const price = car.price ?? car.discount_price;
-						const priceText = price ? `HK$${price.toLocaleString()}` : "Price N/A";
+						const hasDiscount = car.discount_price != null;
+						const priceBase = hasDiscount ? car.discount_price : car.price;
+						const priceText = priceBase ? `HK$${priceBase.toLocaleString()}` : "Price N/A";
 						const colorCode = (car.gen_color_code || "").trim();
 						const colorHex = /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(colorCode) ? colorCode : null;
 						const options = optionsMap.get(car.listing_pk) ?? [];
 						const remarks = remarksMap.get(car.listing_pk) ?? [];
+						const postId = car.id ?? car.url;
+						let href = car.url;
+						if (car.site === "28car" && href) {
+							try {
+								const parsed = new URL(href, "https://www.28car.com");
+								href = `https://www.28car.com${parsed.pathname}${parsed.search}`;
+							} catch {
+								// fallback to original href
+							}
+						}
 						return (
 							<a
 								key={`${car.site}-${car.url}-${idx}`}
-								href={car.url}
+								href={href || car.url}
 								target="_blank"
 								rel="noreferrer"
 								className="flex flex-col gap-2 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:shadow car-detail-tile theme-surface"
 							>
 								<div className="flex items-center justify-between">
-									<div className="text-sm font-semibold text-slate-900">{car.site || "listing"}</div>
+									<div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+										<span>{car.site || "listing"}</span>
+										{postId ? <span className="text-[11px] font-mono text-slate-500">{postId}</span> : null}
+										{href ? (
+											<span aria-label="View listing" className="text-slate-500">
+												🔗
+											</span>
+										) : null}
+									</div>
 									<div className="text-xs uppercase tracking-[0.2em] text-slate-500">
 										{car.sold ? "Sold" : "Available"}
 									</div>
 								</div>
-								<div className="text-lg font-semibold text-slate-900">{priceText}</div>
+								<div className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+									<span>{priceText}</span>
+									{hasDiscount && car.price ? (
+										<span className="text-sm font-normal text-slate-500 line-through">
+											HK${car.price.toLocaleString()}
+										</span>
+									) : null}
+								</div>
 								<div className="text-xs text-slate-600">
 									{car.year || "Year N/A"} · {car.transmission || "Transmission N/A"} ·{" "}
 									{car.mileage_km ? `${car.mileage_km.toLocaleString()} km` : "Mileage N/A"}

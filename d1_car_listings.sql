@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS brands (
   name_zh_hk TEXT,
   sts TEXT, -- 0-disabled, 1=enabled
   electric TEXT, -- 0-no, 1=yes
+  merged_to_slug TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

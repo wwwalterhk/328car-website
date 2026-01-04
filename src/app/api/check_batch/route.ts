@@ -370,6 +370,18 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 	if (!listing) return;
 
 	const brandSlug = normalizeSlug(parsed.brand ?? listing.brand_slug);
+	if (brandSlug) {
+		const exists = await db
+			.prepare("SELECT 1 FROM brands WHERE slug = ? LIMIT 1")
+			.bind(brandSlug)
+			.first<{ "1": number }>();
+		if (!exists) {
+			await db
+				.prepare("INSERT OR IGNORE INTO brands (slug, name_en, name_zh_tw, name_zh_hk, sts) VALUES (?, ?, ?, ?, 2)")
+				.bind(brandSlug, parsed.brand ?? brandSlug, parsed.brand ?? brandSlug, parsed.brand ?? brandSlug)
+				.run();
+		}
+	}
 	if (!brandSlug) return;
 
 	const resolvedModelName = parsed.model_name;
