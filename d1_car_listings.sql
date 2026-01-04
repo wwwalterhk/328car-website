@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS models (
   gen_color_name TEXT,
   gen_color_code TEXT,
   remark TEXT,
-  tect_remark TEXT,
+  tech_remark TEXT,
   raw_json TEXT, -- original JSON payload for audit/debug
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (brand_slug, model_slug),
