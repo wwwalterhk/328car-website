@@ -128,11 +128,12 @@ export default function ModelMergeAdminPage() {
 	};
 
 	return (
-		<div className="relative min-h-screen px-4 py-8 text-slate-900 sm:px-8 lg:px-12">
+		<div className="relative min-h-screen px-4 py-8 text-[color:var(--txt-1)] sm:px-8 lg:px-12">
 			<div
 				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
-					background: "radial-gradient(circle at 15% 20%, rgba(56,189,248,0.14), transparent 35%), radial-gradient(circle at 80% 10%, rgba(94,234,212,0.16), transparent 32%), radial-gradient(circle at 65% 70%, rgba(165,180,252,0.14), transparent 30%), var(--background)",
+					background:
+						"radial-gradient(circle at 15% 20%, rgba(242, 74, 82, 0.12), transparent 35%), radial-gradient(circle at 80% 12%, rgba(255, 122, 102, 0.14), transparent 32%), radial-gradient(circle at 65% 70%, rgba(252, 176, 159, 0.12), transparent 30%), var(--bg-1)",
 				}}
 			/>
 			<div className="mx-auto max-w-6xl space-y-6 text-[13px] sm:text-sm">
@@ -162,7 +163,7 @@ export default function ModelMergeAdminPage() {
 							type="button"
 							disabled={!selectedBrand}
 							onClick={() => setGroupModalOpen(true)}
-							className="inline-flex items-center justify-center rounded-lg border border-emerald-500 bg-emerald-500 px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-[color:var(--accent-2)] px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
 						>
 							New group
 						</button>
@@ -170,7 +171,7 @@ export default function ModelMergeAdminPage() {
 							type="button"
 							disabled={!selectedBrand || !groupOptions.length || mergePks.size === 0}
 							onClick={() => setAssignModalOpen(true)}
-							className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-2)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800"
 						>
 							Assign group
 						</button>
@@ -236,15 +237,17 @@ export default function ModelMergeAdminPage() {
 									typeof models[idx - 1].model_name === "string" &&
 									m.model_name.slice(0, 2).toLowerCase() === models[idx - 1].model_name!.slice(0, 2).toLowerCase();
 
-								const zebra = idx % 2 === 0 ? "bg-white/70 dark:bg-slate-900/60" : "bg-slate-50/70 dark:bg-slate-800/50";
-								const prefixGroupClass = samePrefix ? "border-l-4 border-l-amber-400/70" : "border-l border-l-transparent";
-								const rowClass = `border-b last:border-b-0 transition ${prefixGroupClass} ${
+								const zebra = idx % 2 === 0 ? "bg-[color:var(--cell-1)]" : "bg-[color:var(--cell-2)]";
+								const prefixGroupClass = samePrefix
+									? "border-l-4 border-l-[color:var(--accent-2)]"
+									: "border-l border-l-transparent";
+								const rowClass = `border-b-0 last:border-b-0 transition ${prefixGroupClass} ${
 									isTarget
-										? "bg-emerald-50/70 dark:bg-emerald-900/30"
+										? "bg-[color:var(--accent-3)]"
 										: checked
-											? "bg-slate-100/80 dark:bg-slate-800/60"
+											? "bg-[color:var(--cell-3)]"
 											: zebra
-								} hover:bg-slate-100/80 dark:hover:bg-slate-800/60`;
+								} hover:bg-[color:var(--cell-3)]`;
 								return (
 									<Fragment key={m.model_pk}>
 										<tr key={m.model_pk} className={rowClass}>
@@ -275,7 +278,7 @@ export default function ModelMergeAdminPage() {
 											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.power_kw || "—"}</td>
 											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.facelift || "—"}</td>
 											<td className="px-2 py-1">
-												<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700">
+												<span className="inline-flex items-center rounded-full bg-[color:var(--accent-2)] px-2 py-0.5 text-[11px] font-semibold text-white ring-1 ring-[color:var(--accent-2)]/70">
 													{m.listing_count ?? 0}
 												</span>
 											</td>
@@ -314,24 +317,18 @@ export default function ModelMergeAdminPage() {
 														type="button"
 														className="rounded border px-2 py-1 text-[11px] text-slate-700 hover:-translate-y-0.5 hover:shadow"
 														onClick={() => {
-															// Copy only the pared-down fields plus brand
-															const {
-																model_pk,
-																model_name_slug,
-																model_slug,
-																remark,
-																tech_remark,
-																listing_count,
-																min_year,
-																max_year,
-																...rest
-															} = m as Record<string, unknown>;
 															const payload = {
 																brand: selectedBrand,
-																...(rest as Record<string, unknown>),
-																min_year: m.min_year ?? min_year ?? null,
-																max_year: m.max_year ?? max_year ?? null,
-																listing_count: m.listing_count ?? listing_count ?? null,
+																model_name: m.model_name ?? null,
+																manu_model_code: m.manu_model_code ?? null,
+																body_type: m.body_type ?? null,
+																power: m.power ?? null,
+																engine_cc: m.engine_cc ?? null,
+																power_kw: m.power_kw ?? null,
+																facelift: m.facelift ?? null,
+																listing_count: m.listing_count ?? null,
+																min_year: m.min_year ?? null,
+																max_year: m.max_year ?? null,
 															};
 															const rowJson = JSON.stringify(payload, null, 2);
 															void navigator.clipboard.writeText(rowJson);
@@ -367,8 +364,8 @@ export default function ModelMergeAdminPage() {
 				</div>
 
 				{message ? (
-					<div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800">
-						<span className="h-2 w-2 rounded-full bg-emerald-500" />
+					<div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-xs text-[color:var(--txt-1)] shadow-sm ring-1 ring-slate-200 dark:bg-slate-900/70 dark:text-slate-100 dark:ring-slate-800">
+						<span className="h-2 w-2 rounded-full bg-[color:var(--accent-2)]" />
 						{message}
 					</div>
 				) : null}

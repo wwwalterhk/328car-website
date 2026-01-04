@@ -130,21 +130,21 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 		"Model";
 
 	return (
-		<div className="relative min-h-screen px-6 py-10 text-slate-900 sm:px-10 lg:px-16">
+		<div className="relative min-h-screen px-6 py-10 text-[color:var(--txt-1)] sm:px-10 lg:px-16">
 			<div
 				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
-					backgroundColor: "var(--background)",
+					backgroundColor: "var(--bg-1)",
 					backgroundImage: "var(--page-bg-gradient)",
 				}}
 			/>
 			<div className="mx-auto max-w-5xl space-y-6">
 				<div className="space-y-2">
-					<div className="text-xs uppercase tracking-[0.3em] text-slate-500">{brand}</div>
-					<h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
+					<div className="text-xs uppercase tracking-[0.3em] text-[color:var(--txt-3)]">{brand}</div>
+					<h1 className="text-3xl font-semibold text-[color:var(--txt-1)] sm:text-4xl">
 						{heading} — {yearNumber || "Year"}
 					</h1>
-					<p className="text-sm text-slate-600">
+					<p className="text-sm text-[color:var(--txt-2)]">
 						Active listings for this variant and year in the last 12 months.
 					</p>
 				</div>
@@ -174,47 +174,49 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 								href={href || car.url}
 								target="_blank"
 								rel="noreferrer"
-								className="flex flex-col gap-2 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:shadow car-detail-tile theme-surface"
+								className="flex flex-col gap-2 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-3)] hover:shadow car-detail-tile"
 							>
 								<div className="flex items-center justify-between">
-									<div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-										<span>{car.site || "listing"}</span>
-										{postId ? <span className="text-[11px] font-mono text-slate-500">{postId}</span> : null}
+									<div className="text-sm font-semibold flex items-center gap-2 text-[color:var(--txt-1)]">
+										<span className="uppercase tracking-[0.15em] text-[color:var(--txt-3)]">
+											{car.site || "listing"}
+										</span>
+										{postId ? <span className="text-[11px] font-mono text-[color:var(--txt-3)]">{postId}</span> : null}
 										{href ? (
-											<span aria-label="View listing" className="text-slate-500">
+											<span aria-label="View listing" className="text-[color:var(--txt-3)]">
 												🔗
 											</span>
 										) : null}
 									</div>
-									<div className="text-xs uppercase tracking-[0.2em] text-slate-500">
+									<div className="text-xs uppercase tracking-[0.2em] text-[color:var(--txt-3)]">
 										{car.sold ? "Sold" : "Available"}
 									</div>
 								</div>
-								<div className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+								<div className="text-lg font-semibold flex items-center gap-2 text-[color:var(--txt-1)]">
 									<span>{priceText}</span>
 									{hasDiscount && car.price ? (
-										<span className="text-sm font-normal text-slate-500 line-through">
+										<span className="text-sm font-normal text-[color:var(--txt-3)] line-through">
 											HK${car.price.toLocaleString()}
 										</span>
 									) : null}
 								</div>
-								<div className="text-xs text-slate-600">
+								<div className="text-xs text-[color:var(--txt-2)]">
 									{car.year || "Year N/A"} · {car.transmission || "Transmission N/A"} ·{" "}
 									{car.mileage_km ? `${car.mileage_km.toLocaleString()} km` : "Mileage N/A"}
 								</div>
-								<div className="flex items-center gap-2 text-xs text-slate-600">
+								<div className="flex items-center gap-2 text-xs text-[color:var(--txt-2)]">
 									<span>Color: {car.gen_color_name || car.manu_color_name || "N/A"}</span>
 									{colorHex ? (
 										<span className="flex items-center gap-1">
 											<span
-												className="h-4 w-4 rounded-full border border-slate-200"
+												className="h-4 w-4 rounded-full border border-[color:var(--surface-border)]"
 												style={{ backgroundColor: colorHex }}
 												aria-label={`Color ${colorHex}`}
 											/>
 											
 										</span>
 									) : car.gen_color_code ? (
-										<span className="font-mono text-[11px] text-slate-500">
+										<span className="font-mono text-[11px] text-[color:var(--txt-3)]">
 											{car.gen_color_code}
 										</span>
 									) : null}
@@ -224,11 +226,11 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 										{options.map((opt, idx2) => (
 											<span
 												key={`${car.listing_pk}-${idx2}-${opt.item}`}
-												className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+												className="inline-flex items-center gap-1 rounded-full bg-[color:var(--cell-2)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--txt-1)]"
 											>
 												{opt.item}
 												{opt.certainty ? (
-													<span className="text-[10px] uppercase text-slate-500">
+													<span className="text-[10px] uppercase text-[color:var(--txt-3)]">
 													{opt.certainty}
 												</span>
 											) : null}
@@ -237,7 +239,7 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 									</div>
 								) : null}
 								{remarks.length > 0 ? (
-									<div className="space-y-1 rounded-xl bg-slate-50 p-3 text-[12px] text-slate-700">
+									<div className="space-y-1 rounded-xl bg-[color:var(--cell-2)] p-3 text-[12px] text-[color:var(--txt-2)]">
 										<ul className="list-disc space-y-1 pl-4">
 											{remarks.map((r, idx3) => (
 												<li key={`${car.listing_pk}-remark-${idx3}`} className="leading-snug">

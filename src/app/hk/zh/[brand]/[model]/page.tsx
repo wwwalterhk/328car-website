@@ -182,31 +182,31 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 										{row.listing_count}
 									</div>
 								</div>
-								<div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+								<div className="grid grid-cols-2 gap-2 text-xs  text-[color:var(--txt-1)]">
 									<div>
-										<div className="font-semibold text-slate-700">Year</div>
+										<div className="font-semibold text-[color:var(--txt-3)]">Year</div>
 										<div>{yearText}</div>
 									</div>
 									<div>
-										<div className="font-semibold text-slate-700">Power</div>
+										<div className="font-semibold text-[color:var(--txt-3)]">Power</div>
 										<div>
 											{row.power || "—"} {row.turbo ? `· ${row.turbo}` : ""}
 										</div>
 									</div>
 									<div>
-										<div className="font-semibold text-slate-700">Output</div>
+										<div className="font-semibold text-[color:var(--txt-3)]">Output</div>
 										<div>{powerText}</div>
 									</div>
 									<div>
-										<div className="font-semibold text-slate-700">Body</div>
+										<div className="font-semibold  text-[color:var(--txt-3)]">Body</div>
 										<div>{row.body_type || "—"}</div>
 									</div>
 									<div>
-										<div className="font-semibold text-slate-700">Facelift</div>
+										<div className="font-semibold  text-[color:var(--txt-3)]">Facelift</div>
 										<div>{row.facelift || "—"}</div>
 									</div>
 									<div>
-										<div className="font-semibold text-slate-700">Manu code</div>
+										<div className="font-semibold  text-[color:var(--txt-3)]">Manu code</div>
 										<div>{row.manu_model_code || "—"}</div>
 									</div>
 								</div>
