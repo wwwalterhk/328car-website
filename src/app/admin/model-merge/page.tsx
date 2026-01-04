@@ -57,6 +57,10 @@ export default function ModelMergeAdminPage() {
 	const [editModalOpen, setEditModalOpen] = useState(false);
 	const [editGroupPk, setEditGroupPk] = useState<number | null>(null);
 	const [editForm, setEditForm] = useState({ group_name: "", heading: "", subheading: "", summary: "" });
+	const [apiResult, setApiResult] = useState<string | null>(null);
+	const [consoleOpen, setConsoleOpen] = useState(false);
+	const [consoleTitle, setConsoleTitle] = useState<string>("Status");
+	const [apiLoading, setApiLoading] = useState(false);
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
@@ -203,6 +207,103 @@ export default function ModelMergeAdminPage() {
 							className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 						>
 							Deselect all
+						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Run update");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								const url = `/api/model-groups/content?action=update${
+									selectedBrand ? `&brand=${encodeURIComponent(selectedBrand)}` : ""
+								}`;
+								try {
+									const res = await fetch(url, { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Batch update queued" : "Batch update failed");
+								} catch (error) {
+									setMessage(`Update error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-1)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md"
+						>
+							Run update
+						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Run check");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								const url = `/api/model-groups/content?action=check${
+									selectedBrand ? `&brand=${encodeURIComponent(selectedBrand)}` : ""
+								}`;
+								try {
+									const res = await fetch(url, { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Check completed" : "Check failed");
+								} catch (error) {
+									setMessage(`Check error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-2)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md"
+						>
+							Run check
+						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Brand content update");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								const brand = selectedBrand || "kawasaki";
+								const url = `/api/brands/content?action=update&brand=${encodeURIComponent(brand)}`;
+								try {
+									const res = await fetch(url, { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Brand update queued" : "Brand update failed");
+								} catch (error) {
+									setMessage(`Brand update error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-1)] bg-[color:var(--accent-1)] px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+						>
+							Brand update
+						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Brand content check");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								const url = `/api/brands/content?action=check`;
+								try {
+									const res = await fetch(url, { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Brand check completed" : "Brand check failed");
+								} catch (error) {
+									setMessage(`Brand check error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-[color:var(--accent-2)] px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+						>
+							Brand check
 						</button>
 					</div>
 				</div>
@@ -371,9 +472,9 @@ export default function ModelMergeAdminPage() {
 				) : null}
 			</div>
 
-			{listingModal ? (
-				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
-					<div className="w-full max-w-3xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+				{listingModal ? (
+					<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+						<div className="w-full max-w-3xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
 						<div className="flex items-center justify-between gap-3">
 							<div>
 								<div className="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Listings</div>
@@ -781,7 +882,35 @@ export default function ModelMergeAdminPage() {
 						</div>
 					</div>
 				</div>
-			) : null}
-		</div>
+				) : null}
+
+				{consoleOpen ? (
+					<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+						<div className="w-full max-w-2xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+							<div className="flex items-center justify-between gap-3">
+								<div>
+									<div className="text-xs uppercase tracking-wide text-[color:var(--accent-2)]">{consoleTitle}</div>
+									<div className="text-sm text-[color:var(--txt-2)]">
+										{apiLoading ? "Working..." : apiResult ? "Done" : "Ready"}
+									</div>
+								</div>
+								<button
+									type="button"
+									className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+									onClick={() => setConsoleOpen(false)}
+									aria-label="Close"
+								>
+									×
+								</button>
+							</div>
+							<div className="max-h-[60vh] overflow-auto rounded-xl border border-slate-200/70 bg-white/90 p-3 text-[12px] text-slate-800 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/80 dark:text-slate-100">
+								{apiLoading ? <div className="text-sm text-[color:var(--accent-1)]">Loading…</div> : null}
+								{apiResult ? <pre className="whitespace-pre-wrap text-[11px]">{apiResult}</pre> : null}
+								{!apiLoading && !apiResult ? <div className="text-sm text-slate-500">No output yet.</div> : null}
+							</div>
+						</div>
+					</div>
+				) : null}
+			</div>
 	);
 }

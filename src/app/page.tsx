@@ -196,7 +196,7 @@ export default async function Home() {
 
 				<section className="mt-10 space-y-4">
 					<div className="space-y-1">
-						<h2 className="text-xl font-semibold text-slate-900">Electric models in stock</h2>
+						<h2 className="text-xl font-semibold text-slate-900">Electric models</h2>
 						<p className="text-sm text-slate-600">
 							EV and plug-in models with active listings in the past 12 months.
 						</p>

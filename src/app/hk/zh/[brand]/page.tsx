@@ -238,7 +238,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 
 				<div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-[color:var(--txt-3)]">
 					<span className="h-[1px] w-10 bg-[color:var(--accent-1)]/50" aria-hidden />
-					Models in stock
+					Models
 				</div>
 
 				<div className="space-y-6">
@@ -279,9 +279,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 													{yearText}
 												</div>
 												<div className="text-lg font-semibold text-[color:var(--txt-1)]">{name}</div>
-												<div className="text-xs text-[color:var(--txt-2)]">
-													{model.power || "—"} · {model.manu_model_code || "—"}
-												</div>
+												<div className="text-xs text-[color:var(--txt-2)]">{model.power || "—"} · {model.manu_model_code || "—"}</div>
 											</div>
 											<div
 												className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
@@ -327,9 +325,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 													{yearText}
 												</div>
 												<div className="text-lg font-semibold text-[color:var(--txt-1)]">{name}</div>
-												<div className="text-xs text-[color:var(--txt-2)]">
-													{model.power || "—"} · {model.manu_model_code || "—"}
-												</div>
+												<div className="text-xs text-[color:var(--txt-2)]">{model.power || "—"} · {model.manu_model_code || "—"}</div>
 											</div>
 											<div
 												className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
