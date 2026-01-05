@@ -87,41 +87,53 @@ export default function ModelMergeAdminPage() {
 		target: ModelRow;
 		merges: Array<{ model: ModelRow; listingIds: Array<string | number> }>;
 	} | null>(null);
+	const [lastCrawl, setLastCrawl] = useState<{ site: string | null; created_at: string | null } | null>(null);
 
-	const loadHeading = () => {
-		fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
-			.then((res) => (res.ok ? res.json() : Promise.reject()))
-			.then((data: unknown) => {
-				const count = Number((data as { count?: unknown }).count);
-				setUnprocessedCount(Number.isFinite(count) ? count : null);
-			})
-			.catch(() => setUnprocessedCount(null));
-		fetch("/api/chatgpt/usage", { cache: "no-store" })
-			.then((res) => (res.ok ? res.json() : Promise.reject()))
-			.then((data: unknown) => {
-				const input = Number((data as { input_tokens?: unknown }).input_tokens);
-				const output = Number((data as { output_tokens?: unknown }).output_tokens);
-				const cost = Number((data as { cost_hkd?: unknown }).cost_hkd);
-				const processed = Number((data as { processed?: unknown }).processed);
-				const perRecord = Number((data as { cost_per_record_hkd?: unknown }).cost_per_record_hkd);
-				const perThousand = Number((data as { cost_per_1000_hkd?: unknown }).cost_per_1000_hkd);
-				const lastSubmitted = (data as { last_submitted?: unknown }).last_submitted;
-				setChatUsage(
-					Number.isFinite(input) && Number.isFinite(output) && Number.isFinite(cost)
-						? {
-								input,
-								output,
-								cost,
-								processed: Number.isFinite(processed) ? processed : null,
-								perRecord: Number.isFinite(perRecord) ? perRecord : null,
-								perThousand: Number.isFinite(perThousand) ? perThousand : null,
-								lastSubmitted: typeof lastSubmitted === "string" ? lastSubmitted : null,
-							}
-						: null
-				);
-			})
-			.catch(() => setChatUsage(null));
-	};
+		const loadHeading = () => {
+			fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
+				.then((res) => (res.ok ? res.json() : Promise.reject()))
+				.then((data: unknown) => {
+					const count = Number((data as { count?: unknown }).count);
+					setUnprocessedCount(Number.isFinite(count) ? count : null);
+				})
+				.catch(() => setUnprocessedCount(null));
+			fetch("/api/chatgpt/usage", { cache: "no-store" })
+				.then((res) => (res.ok ? res.json() : Promise.reject()))
+				.then((data: unknown) => {
+					const input = Number((data as { input_tokens?: unknown }).input_tokens);
+					const output = Number((data as { output_tokens?: unknown }).output_tokens);
+					const cost = Number((data as { cost_hkd?: unknown }).cost_hkd);
+					const processed = Number((data as { processed?: unknown }).processed);
+					const perRecord = Number((data as { cost_per_record_hkd?: unknown }).cost_per_record_hkd);
+					const perThousand = Number((data as { cost_per_1000_hkd?: unknown }).cost_per_1000_hkd);
+					const lastSubmitted = (data as { last_submitted?: unknown }).last_submitted;
+					setChatUsage(
+						Number.isFinite(input) && Number.isFinite(output) && Number.isFinite(cost)
+							? {
+									input,
+									output,
+									cost,
+									processed: Number.isFinite(processed) ? processed : null,
+									perRecord: Number.isFinite(perRecord) ? perRecord : null,
+									perThousand: Number.isFinite(perThousand) ? perThousand : null,
+									lastSubmitted: typeof lastSubmitted === "string" ? lastSubmitted : null,
+								}
+							: null
+					);
+				})
+				.catch(() => setChatUsage(null));
+			fetch("/api/car_listings?action=last-crawl", { cache: "no-store" })
+				.then((res) => (res.ok ? res.json() : Promise.reject()))
+				.then((data: unknown) => {
+					const site = (data as { site?: unknown }).site;
+					const created_at = (data as { created_at?: unknown }).created_at;
+					setLastCrawl({
+						site: typeof site === "string" ? site : null,
+						created_at: typeof created_at === "string" ? created_at : null,
+					});
+				})
+				.catch(() => setLastCrawl(null));
+		};
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
@@ -284,6 +296,12 @@ export default function ModelMergeAdminPage() {
 										Last batch: {chatUsage.lastSubmitted}
 									</>
 								) : null}
+							</span>
+						) : null}
+						{lastCrawl ? (
+							<span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold text-[color:var(--txt-1)] ring-1 ring-slate-200/60 dark:bg-slate-800/70">
+								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-3)]" aria-hidden />
+								Last crawl: {lastCrawl.site || "—"} @ {lastCrawl.created_at || "—"}
 							</span>
 						) : null}
 					</div>

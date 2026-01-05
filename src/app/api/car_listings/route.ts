@@ -144,6 +144,22 @@ export async function GET(request: NextRequest) {
 		}
 	}
 
+	if (action === "last-crawl") {
+		try {
+			const row = await db
+				.prepare(
+					`SELECT site, created_at
+           FROM car_listings
+           ORDER BY created_at DESC
+           LIMIT 1`
+				)
+				.first<{ site: string | null; created_at: string | null }>();
+			return NextResponse.json({ site: row?.site ?? null, created_at: row?.created_at ?? null });
+		} catch (error) {
+			return NextResponse.json({ error: "Failed to load count", details: `${error}` }, { status: 500 });
+		}
+	}
+
 	const limit = clampLimit(searchParams.get("limit"));
 	const siteFilter = searchParams.get("site")?.trim();
 
