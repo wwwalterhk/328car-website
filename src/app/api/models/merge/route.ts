@@ -36,7 +36,19 @@ export async function POST(request: NextRequest) {
 	if (!db) return NextResponse.json({ error: 'Missing binding "DB"' }, { status: 500 });
 
 	try {
-		await db.exec("BEGIN");
+		// quick check for merged_to_model_pk column
+		const hasMergedColumn = await db
+			.prepare(
+				`SELECT 1 FROM pragma_table_info('models') WHERE name = 'merged_to_model_pk' LIMIT 1`
+			)
+			.first<{ 1: number }>();
+		if (!hasMergedColumn) {
+			return NextResponse.json(
+				{ error: "Failed to merge models", details: "Column merged_to_model_pk is missing; please add it to models." },
+				{ status: 500 }
+			);
+		}
+
 		const updateListings = await db
 			.prepare(`UPDATE car_listings SET model_pk = ?, model_sts = 1 WHERE model_pk IN (${placeholders})`)
 			.bind(targetPk, ...mergePks)
@@ -45,7 +57,6 @@ export async function POST(request: NextRequest) {
 			.prepare(`UPDATE models SET merged_to_model_pk = ? WHERE model_pk IN (${placeholders})`)
 			.bind(targetPk, ...mergePks)
 			.run();
-		await db.exec("COMMIT");
 		return NextResponse.json({
 			ok: true,
 			target_model_pk: targetPk,
@@ -54,11 +65,6 @@ export async function POST(request: NextRequest) {
 			updated_models: updateModels.meta?.changes ?? 0,
 		});
 	} catch (error) {
-		try {
-			await db.exec("ROLLBACK");
-		} catch {
-			// ignore rollback error
-		}
 		return NextResponse.json({ error: "Failed to merge models", details: `${error}` }, { status: 500 });
 	}
 }

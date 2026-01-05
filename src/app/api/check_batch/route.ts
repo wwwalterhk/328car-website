@@ -405,10 +405,32 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 	);
 	const modelNameSlug = normalizeSlug(resolvedModelName);
 
+	// Find existing model (and potential merge target) before inserting/updating
+	const existingModel = await db
+		.prepare(
+			`SELECT model_pk, merged_to_model_pk
+       FROM models
+       WHERE brand_slug = ?
+         AND (
+           (? IS NOT NULL AND model_slug = ?)
+           OR (? IS NULL AND manu_model_code IS ? AND model_name IS ?)
+         )
+       ORDER BY model_pk DESC
+       LIMIT 1`
+		)
+		.bind(brandSlug, modelSlug, modelSlug, modelSlug, parsed.manu_model_code, resolvedModelName)
+		.first<{ model_pk: number; merged_to_model_pk: number | null }>();
+
+	const targetModelPk = existingModel?.merged_to_model_pk ?? existingModel?.model_pk ?? null;
+
 	const statements = [
-		db
-			.prepare(
-				`INSERT INTO models (
+		// Insert/upssert only if we don't already have a merged target
+		...(targetModelPk
+			? []
+			: [
+					db
+						.prepare(
+							`INSERT INTO models (
            brand, brand_slug, model_slug, manu_model_code, body_type, engine_cc, power_kw,
            horse_power_ps, range, power, turbo, facelift, transmission, transmission_gears,
            mileage_km, model_name, model_name_slug, manu_color_name, gen_color_name, gen_color_code, raw_json
@@ -434,44 +456,45 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
            gen_color_name = excluded.gen_color_name,
            gen_color_code = excluded.gen_color_code,
            raw_json = excluded.raw_json`
-			)
-			.bind(
-				parsed.brand,
-				brandSlug,
-				modelSlug,
-				parsed.manu_model_code,
-				parsed.body_type,
-				parsed.engine_cc,
-				parsed.power_kw,
-				parsed.horse_power_ps,
-				parsed.range,
-				parsed.power,
-				parsed.turbo,
-				parsed.facelift,
-				parsed.transmission,
-				parsed.transmission_gears,
-				parsed.mileage_km,
-				resolvedModelName,
-				modelNameSlug,
-				parsed.manu_color_name,
-				parsed.gen_color_name,
-				parsed.gen_color_code,
-				parsed.raw_json
-			),
+						)
+						.bind(
+							parsed.brand,
+							brandSlug,
+							modelSlug,
+							parsed.manu_model_code,
+							parsed.body_type,
+							parsed.engine_cc,
+							parsed.power_kw,
+							parsed.horse_power_ps,
+							parsed.range,
+							parsed.power,
+							parsed.turbo,
+							parsed.facelift,
+							parsed.transmission,
+							parsed.transmission_gears,
+							parsed.mileage_km,
+							resolvedModelName,
+							modelNameSlug,
+							parsed.manu_color_name,
+							parsed.gen_color_name,
+							parsed.gen_color_code,
+							parsed.raw_json
+						),
+				]),
 		db
 			.prepare(
 				`UPDATE car_listings
-					SET model_pk = (
-					SELECT model_pk
-					FROM models
-					WHERE brand_slug = ?
-						AND (
-						(? IS NOT NULL AND model_slug = ?)
-						OR (? IS NULL AND manu_model_code IS ? AND model_name IS ?)
-						)
-					ORDER BY model_pk DESC
-					LIMIT 1
-					),
+					SET model_pk = COALESCE(?, (
+						SELECT model_pk
+						FROM models
+						WHERE brand_slug = ?
+							AND (
+							(? IS NOT NULL AND model_slug = ?)
+							OR (? IS NULL AND manu_model_code IS ? AND model_name IS ?)
+							)
+						ORDER BY model_pk DESC
+						LIMIT 1
+					)),
 					model_sts = 1,
 					manu_color_name = ?,
 					gen_color_name = ?,
@@ -479,6 +502,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 				WHERE model_pk is null AND site = ? AND id = ?`
 			)
 			.bind(
+				targetModelPk,
 				brandSlug,
 				modelSlug,
 				modelSlug,

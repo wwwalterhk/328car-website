@@ -19,6 +19,7 @@ type ModelRow = {
 	max_year: number | null;
 	group_name: string | null;
 	group_slug: string | null;
+	merged_to_model_pk: number | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
          m.facelift,
          m.remark,
          m.tech_remark,
+         m.merged_to_model_pk,
          g.group_name,
          g.group_slug,
          COUNT(c.listing_pk) AS listing_count

@@ -27,6 +27,7 @@ type ModelRow = {
 	max_year?: number | null;
 	group_name?: string | null;
 	group_slug?: string | null;
+	merged_to_model_pk?: number | null;
 };
 
 async function fetchBrands(): Promise<Brand[]> {
@@ -82,7 +83,10 @@ export default function ModelMergeAdminPage() {
 	} | null>(null);
 	const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 	const [autoModal, setAutoModal] = useState<{ items: Array<{ model_pk: number; model_name: string | null; group_pk: number; group_name: string; keyword: string }> } | null>(null);
-	const [mergeModal, setMergeModal] = useState<{ target: ModelRow; merges: ModelRow[] } | null>(null);
+	const [mergeModal, setMergeModal] = useState<{
+		target: ModelRow;
+		merges: Array<{ model: ModelRow; listingIds: Array<string | number> }>;
+	} | null>(null);
 
 	const loadHeading = () => {
 		fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
@@ -166,6 +170,40 @@ export default function ModelMergeAdminPage() {
 			})),
 		[brands]
 	);
+
+	const flattenedModels = useMemo(() => {
+		const roots: ModelRow[] = [];
+		const childrenMap = new Map<number, ModelRow[]>();
+		const all = models.slice();
+		all.forEach((m) => {
+			if (m.merged_to_model_pk) {
+				const arr = childrenMap.get(m.merged_to_model_pk) ?? [];
+				arr.push(m);
+				childrenMap.set(m.merged_to_model_pk, arr);
+			} else {
+				roots.push(m);
+			}
+		});
+		// handle orphans whose parent not in roots
+		const rootIds = new Set(roots.map((r) => r.model_pk));
+		for (const [parent, kids] of childrenMap.entries()) {
+			if (!rootIds.has(parent)) {
+				kids.forEach((k) => roots.push(k));
+			}
+		}
+		const rows: Array<{ row: ModelRow; depth: number; mergedInto?: number }> = [];
+		roots.forEach((r) => {
+			rows.push({ row: r, depth: 0 });
+			const children = childrenMap.get(r.model_pk);
+			if (children?.length) {
+				children
+					.slice()
+					.sort((a, b) => (a.model_name || "").localeCompare(b.model_name || ""))
+					.forEach((c) => rows.push({ row: c, depth: 1, mergedInto: r.model_pk }));
+			}
+		});
+		return rows;
+	}, [models]);
 
 	const toggleMerge = (pk: number) => {
 		setMergePks((prev) => {
@@ -484,14 +522,35 @@ export default function ModelMergeAdminPage() {
 						<button
 							type="button"
 							disabled={!mergePks.size || !targetPk}
-							onClick={() => {
+							onClick={async () => {
 								const target = models.find((m) => m.model_pk === targetPk);
 								const merges = models.filter((m) => mergePks.has(m.model_pk) && m.model_pk !== targetPk);
 								if (!target || !merges.length) {
 									setMessage("Select a target and at least one merge row");
 									return;
 								}
-								setMergeModal({ target, merges });
+								try {
+									const mergesWithIds = await Promise.all(
+										merges.map(async (m) => {
+											try {
+												const res = await fetch(`/api/models/listings?model_pk=${m.model_pk}`, { cache: "no-store" });
+												const data = (await res.json()) as { listings?: Array<{ id?: string | number }> };
+												const ids =
+													Array.isArray(data.listings) && data.listings.length
+														? data.listings
+																.map((l) => (l.id != null ? l.id : ""))
+																.filter((v) => v !== "")
+														: [];
+												return { model: m, listingIds: ids };
+											} catch {
+												return { model: m, listingIds: [] };
+											}
+										})
+									);
+									setMergeModal({ target, merges: mergesWithIds });
+								} catch (error) {
+									setMessage(`Failed to load listing ids: ${error}`);
+								}
 							}}
 							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-1)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800"
 						>
@@ -552,14 +611,15 @@ export default function ModelMergeAdminPage() {
 							</tr>
 						</thead>
 						<tbody>
-							{(showUnassignedOnly ? models.filter((m) => !m.group_name) : models).map((m, idx, arr) => {
+							{(showUnassignedOnly ? flattenedModels.filter((m) => !m.row.group_name) : flattenedModels).map((item, idx, arr) => {
+								const m = item.row;
 								const checked = mergePks.has(m.model_pk);
 								const isTarget = targetPk === m.model_pk;
 								const samePrefix =
 									idx > 0 &&
 									typeof m.model_name === "string" &&
-									typeof arr[idx - 1]?.model_name === "string" &&
-									m.model_name.slice(0, 2).toLowerCase() === arr[idx - 1].model_name!.slice(0, 2).toLowerCase();
+									typeof arr[idx - 1]?.row.model_name === "string" &&
+									m.model_name.slice(0, 2).toLowerCase() === arr[idx - 1].row.model_name!.slice(0, 2).toLowerCase();
 
 								const zebra = idx % 2 === 0 ? "bg-[color:var(--cell-1)]" : "bg-[color:var(--cell-2)]";
 								const prefixGroupClass = samePrefix
@@ -572,6 +632,11 @@ export default function ModelMergeAdminPage() {
 											? "bg-[color:var(--cell-3)]"
 											: zebra
 								} hover:bg-[color:var(--cell-3)]`;
+								const indentClass = item.depth === 1 ? "pl-6" : "";
+								const mergedBadge =
+									item.depth === 1 && item.mergedInto
+										? "inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700"
+										: null;
 								return (
 									<Fragment key={m.model_pk}>
 										<tr key={m.model_pk} className={rowClass}>
@@ -592,8 +657,13 @@ export default function ModelMergeAdminPage() {
 													className="h-4 w-4"
 												/>
 											</td>
-											<td className="px-2 py-1 text-slate-900 dark:text-slate-50">
+											<td className={`px-2 py-1 text-slate-900 dark:text-slate-50 ${indentClass}`}>
 												<span className={samePrefix ? "font-semibold" : ""}>{m.model_name || "—"}</span>
+												{mergedBadge ? (
+													<span className="ml-2 align-middle">
+														<span className={mergedBadge}>merged → {item.mergedInto}</span>
+													</span>
+												) : null}
 											</td>
 											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.manu_model_code || "—"}</td>
 											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.body_type || "—"}</td>
@@ -1261,11 +1331,12 @@ export default function ModelMergeAdminPage() {
 			{mergeModal ? (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
 					<div className="w-full max-w-3xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
-						<div className="flex items-center justify-between gap-3">
-							<div>
-								<div className="text-xs uppercase tracking-wide text-[color:var(--accent-1)]">Merge models</div>
-								<div className="text-sm text-[color:var(--txt-2)]">
-									Target: <span className="font-semibold">{mergeModal.target.model_name || mergeModal.target.model_slug}</span>
+							<div className="flex items-center justify-between gap-3">
+								<div>
+									<div className="text-xs uppercase tracking-wide text-[color:var(--accent-1)]">Merge models</div>
+									<div className="text-sm text-[color:var(--txt-2)]">
+									Target (model_pk {mergeModal.target.model_pk}):{" "}
+										<span className="font-semibold">{mergeModal.target.model_name || mergeModal.target.model_slug}</span>
 								</div>
 							</div>
 							<button
@@ -1285,15 +1356,19 @@ export default function ModelMergeAdminPage() {
 										<th className="border-b px-2 py-1 text-left">manu_model_code</th>
 										<th className="border-b px-2 py-1 text-left">model_name</th>
 										<th className="border-b px-2 py-1 text-left">body_type</th>
+										<th className="border-b px-2 py-1 text-left">Listing IDs</th>
 									</tr>
 								</thead>
 								<tbody>
-									{mergeModal.merges.map((m) => (
-										<tr key={m.model_pk} className="border-b last:border-b-0">
-											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.model_pk}</td>
-											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.manu_model_code || "—"}</td>
-											<td className="px-2 py-1 text-slate-800 dark:text-slate-100">{m.model_name || "—"}</td>
-											<td className="px-2 py-1 text-slate-700 dark:text-slate-200">{m.body_type || "—"}</td>
+									{mergeModal.merges.map(({ model, listingIds }) => (
+										<tr key={model.model_pk} className="border-b last:border-b-0">
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{model.model_pk}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{model.manu_model_code || "—"}</td>
+											<td className="px-2 py-1 text-slate-800 dark:text-slate-100">{model.model_name || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-200">{model.body_type || "—"}</td>
+											<td className="px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300">
+												{listingIds.length ? listingIds.join(", ") : "No listings"}
+											</td>
 										</tr>
 									))}
 								</tbody>
@@ -1318,7 +1393,7 @@ export default function ModelMergeAdminPage() {
 											headers: { "content-type": "application/json" },
 											body: JSON.stringify({
 												target_model_pk: mergeModal.target.model_pk,
-												merge_model_pks: mergeModal.merges.map((m) => m.model_pk),
+												merge_model_pks: mergeModal.merges.map((m) => m.model.model_pk),
 											}),
 										});
 										const data = (await res.json()) as { error?: string };
@@ -1328,10 +1403,15 @@ export default function ModelMergeAdminPage() {
 											setMessage("Merged successfully");
 											setModels((prev) =>
 												prev
-													.filter((m) => !mergeModal.merges.some((x) => x.model_pk === m.model_pk))
+													.filter((m) => !mergeModal.merges.some((x) => x.model.model_pk === m.model_pk))
 													.map((m) =>
 														m.model_pk === mergeModal.target.model_pk
-															? { ...m, listing_count: (m.listing_count ?? 0) + (mergeModal.merges.reduce((acc, cur) => acc + (cur.listing_count ?? 0), 0)) }
+															? {
+																	...m,
+																	listing_count:
+																		(m.listing_count ?? 0) +
+																		mergeModal.merges.reduce((acc, cur) => acc + (cur.model.listing_count ?? 0), 0),
+																}
 															: m
 													)
 											);
