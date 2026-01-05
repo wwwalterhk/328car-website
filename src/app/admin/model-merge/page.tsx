@@ -61,9 +61,52 @@ export default function ModelMergeAdminPage() {
 	const [consoleOpen, setConsoleOpen] = useState(false);
 	const [consoleTitle, setConsoleTitle] = useState<string>("Status");
 	const [apiLoading, setApiLoading] = useState(false);
+	const [unprocessedCount, setUnprocessedCount] = useState<number | null>(null);
+	const [chatUsage, setChatUsage] = useState<{
+		input: number;
+		output: number;
+		cost: number;
+		processed: number | null;
+		perRecord: number | null;
+		perThousand: number | null;
+		lastSubmitted: string | null;
+	} | null>(null);
 
 	useEffect(() => {
 		fetchBrands().then(setBrands);
+		// fetch unprocessed car count
+		fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
+			.then((res) => (res.ok ? res.json() : Promise.reject()))
+			.then((data: unknown) => {
+				const count = Number((data as { count?: unknown }).count);
+				setUnprocessedCount(Number.isFinite(count) ? count : null);
+			})
+			.catch(() => setUnprocessedCount(null));
+		fetch("/api/chatgpt/usage", { cache: "no-store" })
+			.then((res) => (res.ok ? res.json() : Promise.reject()))
+			.then((data: unknown) => {
+				const input = Number((data as { input_tokens?: unknown }).input_tokens);
+				const output = Number((data as { output_tokens?: unknown }).output_tokens);
+				const cost = Number((data as { cost_hkd?: unknown }).cost_hkd);
+				const processed = Number((data as { processed?: unknown }).processed);
+				const perRecord = Number((data as { cost_per_record_hkd?: unknown }).cost_per_record_hkd);
+				const perThousand = Number((data as { cost_per_1000_hkd?: unknown }).cost_per_1000_hkd);
+				const lastSubmitted = (data as { last_submitted?: unknown }).last_submitted;
+				setChatUsage(
+					Number.isFinite(input) && Number.isFinite(output) && Number.isFinite(cost)
+						? {
+								input,
+								output,
+								cost,
+								processed: Number.isFinite(processed) ? processed : null,
+								perRecord: Number.isFinite(perRecord) ? perRecord : null,
+								perThousand: Number.isFinite(perThousand) ? perThousand : null,
+								lastSubmitted: typeof lastSubmitted === "string" ? lastSubmitted : null,
+							}
+						: null
+				);
+			})
+			.catch(() => setChatUsage(null));
 	}, []);
 
 	useEffect(() => {
@@ -141,8 +184,47 @@ export default function ModelMergeAdminPage() {
 				}}
 			/>
 			<div className="mx-auto max-w-6xl space-y-6 text-[13px] sm:text-sm">
-				<div className="space-y-2 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.65)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-900/60">
-					<h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Model merge</h1>
+				<div className="space-y-3 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.65)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-900/60">
+					<div className="flex flex-wrap items-center gap-3">
+						<h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Model merge</h1>
+						{unprocessedCount != null ? (
+							<span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-3)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-1)] ring-1 ring-[color:var(--accent-1)]/30">
+								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-1)]" aria-hidden />
+								Unprocessed cars: {unprocessedCount}
+							</span>
+						) : null}
+						{chatUsage ? (
+							<span className="inline-flex flex-wrap items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold text-[color:var(--txt-1)] ring-1 ring-[color:var(--accent-2)]/30 dark:bg-slate-800/70">
+								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-2)]" aria-hidden />
+								Tokens in {chatUsage.input.toLocaleString()} / out {chatUsage.output.toLocaleString()} · Cost ~
+								{chatUsage.cost.toFixed(2)} HKD
+								{chatUsage.processed != null ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-slate-300" aria-hidden />
+										Processed: {chatUsage.processed.toLocaleString()}
+									</>
+								) : null}
+								{chatUsage.perRecord != null ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-slate-300" aria-hidden />
+										Cost/record: {chatUsage.perRecord.toFixed(4)} HKD
+									</>
+								) : null}
+								{chatUsage.perThousand != null ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-slate-300" aria-hidden />
+										Cost/1k: {chatUsage.perThousand.toFixed(2)} HKD
+									</>
+								) : null}
+								{chatUsage.lastSubmitted ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-slate-300" aria-hidden />
+										Last batch: {chatUsage.lastSubmitted}
+									</>
+								) : null}
+							</span>
+						) : null}
+					</div>
 					<p className="text-[13px] text-slate-600 dark:text-slate-200">
 						Choose a brand, pick one target row, then flag models to merge into it. Copy a row for reference or adjust remarks inline.
 					</p>

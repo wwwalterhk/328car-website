@@ -134,6 +134,16 @@ export async function GET(request: NextRequest) {
 	}
 
 	const { searchParams } = new URL(request.url);
+	const action = (searchParams.get("action") || "").toLowerCase();
+	if (action === "unprocessed-count") {
+		try {
+			const row = await db.prepare("SELECT COUNT(1) AS count FROM car_listings WHERE model_pk IS NULL").first<{ count: number }>();
+			return NextResponse.json({ count: row?.count ?? 0 });
+		} catch (error) {
+			return NextResponse.json({ error: "Failed to load count", details: `${error}` }, { status: 500 });
+		}
+	}
+
 	const limit = clampLimit(searchParams.get("limit"));
 	const siteFilter = searchParams.get("site")?.trim();
 
