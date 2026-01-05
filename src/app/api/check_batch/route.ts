@@ -217,7 +217,7 @@ async function processBatchFiles(
 ) {
 	const fileId = outputFileId || errorFileId;
 	if (!fileId) {
-		const fallbackStatus = errorFileId ? "failed" : "completed";
+		const fallbackStatus = batchFailed ? "failed" : errorFileId ? "failed" : "completed";
 		await db
 			.prepare(
 				`UPDATE chatgpt_batch_items
@@ -232,6 +232,17 @@ async function processBatchFiles(
 					`UPDATE chatgpt_batches
          SET failed_at = datetime('now')
          WHERE batch_id = ? AND failed_at IS NULL`
+				)
+				.bind(batchId)
+				.run();
+
+			await db
+				.prepare(
+					`UPDATE car_listings
+           SET model_sts = 3
+           WHERE listing_pk IN (
+             SELECT listing_pk FROM chatgpt_batch_items WHERE batch_id = ? AND listing_pk IS NOT NULL
+           )`
 				)
 				.bind(batchId)
 				.run();
@@ -286,10 +297,14 @@ async function processBatchFiles(
 					.prepare(
 						`UPDATE chatgpt_batch_items
            SET status = ?, result_json = ?, error_message = CASE WHEN ? = 'failed' THEN ? ELSE NULL END, updated_at = datetime('now')
-           WHERE batch_id = ? AND site = ? AND listing_id = ?`
+          WHERE batch_id = ? AND site = ? AND listing_id = ?`
 					)
 					.bind(status, resultJson, status, entry.error ? JSON.stringify(entry.error) : null, batchId, site, listingId)
 					.run();
+
+				if (status === "failed" && hasListingPk && itemRow?.listing_pk != null) {
+					await markListingFailed(db, itemRow.listing_pk);
+				}
 
 				if (status === "completed") {
 					const responseRecord = isRecord(entry.response) ? entry.response : null;
@@ -540,6 +555,10 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 	}
 
 	await db.batch(statements);
+}
+
+async function markListingFailed(db: D1Database, listingPk: number) {
+	await db.prepare("UPDATE car_listings SET sts = 3 WHERE listing_pk = ?").bind(listingPk).run();
 }
 
 function parseModelOutput(payload: unknown): ModelOutput | null {

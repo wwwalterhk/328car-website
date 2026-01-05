@@ -68,7 +68,7 @@ SELECT
   brand, brand_slug, model, seats, color, body_type,
   summary, remark, photos, vehicle_type
 FROM car_listings
-WHERE 1=1
+WHERE model_pk is null AND sts = 1 AND model_sts = 0 
   AND listing_pk NOT IN (
     SELECT listing_pk
     FROM chatgpt_batch_items
@@ -300,6 +300,13 @@ async function handleCreate(opts: {
          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
       )
       .bind(batchId, item.listing_pk, item.site, item.id, itemStatus)
+      .run();
+
+      await db
+      .prepare(
+        `UPDATE car_listings SET model_sts = 2 WHERE listing_pk = ?`
+      )
+      .bind( item.listing_pk)
       .run();
   }
 

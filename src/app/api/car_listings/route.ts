@@ -137,8 +137,22 @@ export async function GET(request: NextRequest) {
 	const action = (searchParams.get("action") || "").toLowerCase();
 	if (action === "unprocessed-count") {
 		try {
-			const row = await db.prepare("SELECT COUNT(1) AS count FROM car_listings WHERE model_pk IS NULL").first<{ count: number }>();
-			return NextResponse.json({ count: row?.count ?? 0 });
+			const row = await db
+				.prepare(
+					`SELECT
+             SUM(CASE WHEN model_pk IS NULL AND sts = 1 AND model_sts = 0 AND listing_pk NOT IN (
+               SELECT listing_pk FROM chatgpt_batch_items WHERE listing_pk IS NOT NULL
+             ) THEN 1 ELSE 0 END) AS pending,
+             SUM(CASE WHEN model_pk IS NULL AND sts = 1 AND model_sts = 2 THEN 1 ELSE 0 END) AS processing,
+             SUM(CASE WHEN model_pk IS NULL AND sts = 1 AND model_sts = 3 THEN 1 ELSE 0 END) AS failed
+           FROM car_listings`
+				)
+				.first<{ pending: number; processing: number; failed: number }>();
+			return NextResponse.json({
+				count: row?.pending ?? 0,
+				processing: row?.processing ?? 0,
+				failed: row?.failed ?? 0,
+			});
 		} catch (error) {
 			return NextResponse.json({ error: "Failed to load count", details: `${error}` }, { status: 500 });
 		}

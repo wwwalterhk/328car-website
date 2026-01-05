@@ -72,6 +72,8 @@ export default function ModelMergeAdminPage() {
 	const [consoleTitle, setConsoleTitle] = useState<string>("Status");
 	const [apiLoading, setApiLoading] = useState(false);
 	const [unprocessedCount, setUnprocessedCount] = useState<number | null>(null);
+	const [processingCount, setProcessingCount] = useState<number | null>(null);
+	const [failedCount, setFailedCount] = useState<number | null>(null);
 	const [chatUsage, setChatUsage] = useState<{
 		input: number;
 		output: number;
@@ -94,9 +96,17 @@ export default function ModelMergeAdminPage() {
 				.then((res) => (res.ok ? res.json() : Promise.reject()))
 				.then((data: unknown) => {
 					const count = Number((data as { count?: unknown }).count);
+					const processing = Number((data as { processing?: unknown }).processing);
+					const failed = Number((data as { failed?: unknown }).failed);
 					setUnprocessedCount(Number.isFinite(count) ? count : null);
+					setProcessingCount(Number.isFinite(processing) ? processing : null);
+					setFailedCount(Number.isFinite(failed) ? failed : null);
 				})
-				.catch(() => setUnprocessedCount(null));
+				.catch(() => {
+					setUnprocessedCount(null);
+					setProcessingCount(null);
+					setFailedCount(null);
+				});
 			fetch("/api/chatgpt/usage", { cache: "no-store" })
 				.then((res) => (res.ok ? res.json() : Promise.reject()))
 				.then((data: unknown) => {
@@ -261,10 +271,52 @@ export default function ModelMergeAdminPage() {
 							<span aria-hidden>⟳</span>
 							Refresh
 						</button>
-						{unprocessedCount != null ? (
-							<span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-3)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-1)] ring-1 ring-[color:var(--accent-1)]/30">
+						<a
+							href="/admin/brand-hero"
+							target="_blank"
+							rel="noreferrer"
+							className="inline-flex items-center justify-center rounded-full border border-[color:var(--accent-3)] bg-white px-3 py-1 text-[12px] font-semibold text-[color:var(--accent-3)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)]/30 hover:shadow-sm"
+						>
+							Hero upload
+						</a>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Process 50 records");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								try {
+									const res = await fetch("/api/create_batch?limit=50", { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Create batch triggered" : "Create batch failed");
+								} catch (error) {
+									setMessage(`Create batch error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-full border border-[color:var(--accent-3)] bg-white px-3 py-1 text-[12px] font-semibold text-[color:var(--accent-3)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)]/30 hover:shadow-sm"
+						>
+							Process 50
+						</button>
+						{unprocessedCount != null || processingCount != null || failedCount != null ? (
+							<span className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[color:var(--accent-3)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-1)] ring-1 ring-[color:var(--accent-1)]/30">
 								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-1)]" aria-hidden />
-								Unprocessed cars: {unprocessedCount}
+								Unprocessed: {unprocessedCount ?? "—"}
+								{processingCount != null ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-[color:var(--accent-1)]/50" aria-hidden />
+										Processing: {processingCount}
+									</>
+								) : null}
+								{failedCount != null ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-[color:var(--accent-1)]/50" aria-hidden />
+										Failed: {failedCount}
+									</>
+								) : null}
 							</span>
 						) : null}
 						{chatUsage ? (
@@ -467,28 +519,6 @@ export default function ModelMergeAdminPage() {
 							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-[color:var(--accent-2)] px-3 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
 						>
 							Brand check
-						</button>
-						<button
-							type="button"
-							onClick={async () => {
-								setConsoleTitle("Process 50 records");
-								setConsoleOpen(true);
-								setApiLoading(true);
-								setApiResult(null);
-								try {
-									const res = await fetch("/api/create_batch?limit=50", { cache: "no-store" });
-									const data = await res.json();
-									setApiResult(JSON.stringify(data, null, 2));
-									setMessage(res.ok ? "Create batch triggered" : "Create batch failed");
-								} catch (error) {
-									setMessage(`Create batch error: ${error}`);
-								} finally {
-									setApiLoading(false);
-								}
-							}}
-							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-3)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-3)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)]/40 hover:shadow-md"
-						>
-							Process 50
 						</button>
 						<button
 							type="button"

@@ -56,7 +56,7 @@ export default {
 				console.error(`Cron ${label} failed`, error);
 			});
 
-		if (!cron || cron === "*/1 * * * *") {
+		if (!cron || cron === "*/3 * * * *") {
 			jobs.push(scheduleCall(CREATE_BATCH_URL, "create_batch"));
 		}
 		if (!cron || cron === "*/10 * * * *") {
