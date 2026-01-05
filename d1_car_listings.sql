@@ -420,7 +420,6 @@ WHEN
   COALESCE(OLD.sold, -1)                != COALESCE(NEW.sold, -1) OR
   COALESCE(OLD.brand_slug, '')          != COALESCE(NEW.brand_slug, '') OR
   COALESCE(OLD.model_pk, -1)            != COALESCE(NEW.model_pk, -1) OR
-  COALESCE(OLD.model_sts, -1)           != COALESCE(NEW.model_sts, -1) OR
   COALESCE(OLD.model, '')               != COALESCE(NEW.model, '') OR
   COALESCE(OLD.last_update_datetime,'') != COALESCE(NEW.last_update_datetime,'')
 BEGIN
