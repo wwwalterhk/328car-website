@@ -514,7 +514,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 					manu_color_name = ?,
 					gen_color_name = ?,
 					gen_color_code = ?,
-					mileage_km = ?
+					mileage_km_ai = ? 
 				WHERE model_pk is null AND site = ? AND id = ?`
 			)
 			.bind(

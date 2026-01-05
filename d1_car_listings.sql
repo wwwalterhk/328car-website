@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS models (
   transmission TEXT,
   transmission_gears TEXT,
   mileage_km INTEGER,
+  mileage_km_ai INTEGER,
   model_name TEXT,
   model_name_slug TEXT,
   manu_color_name TEXT,
