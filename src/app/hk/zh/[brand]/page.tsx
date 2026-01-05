@@ -116,7 +116,7 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         AND b.slug = ?
       GROUP BY
         m.model_name_slug, m.manu_model_code
-      ORDER BY (m.model_groups_pk IS NULL), g.group_name, listing_count DESC`
+      ORDER BY min_year DESC, m.model_name, m.power`
 		)
 		.bind(brandSlug)
 		.all<ModelRow>();

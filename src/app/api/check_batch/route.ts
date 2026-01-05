@@ -437,7 +437,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 		.first<{ model_pk: number; merged_to_model_pk: number | null }>();
 
 	const targetModelPk = existingModel?.merged_to_model_pk ?? existingModel?.model_pk ?? null;
-
+		
 	const statements = [
 		// Insert/upssert only if we don't already have a merged target
 		...(targetModelPk
@@ -513,7 +513,8 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 					model_sts = 1,
 					manu_color_name = ?,
 					gen_color_name = ?,
-					gen_color_code = ?
+					gen_color_code = ?,
+					mileage_km = ?
 				WHERE model_pk is null AND site = ? AND id = ?`
 			)
 			.bind(
@@ -527,6 +528,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 				parsed.manu_color_name,
 				parsed.gen_color_name,
 				parsed.gen_color_code,
+				parsed.mileage_km,
 				parsed.site,
 				parsed.id
 			),
@@ -558,7 +560,7 @@ async function applyModelOutput(db: D1Database, payload: unknown) {
 }
 
 async function markListingFailed(db: D1Database, listingPk: number) {
-	await db.prepare("UPDATE car_listings SET sts = 3 WHERE listing_pk = ?").bind(listingPk).run();
+	await db.prepare("UPDATE car_listings SET model_sts = 3 WHERE listing_pk = ?").bind(listingPk).run();
 }
 
 function parseModelOutput(payload: unknown): ModelOutput | null {
