@@ -34,7 +34,7 @@ export async function GET() {
 		const lastSubmitted = row?.last_submitted ?? null;
 		const cost_hkd = ((input * 0.875 + output * 7) / 1_000_000) * 7.787;
 		const cost_per_record_hkd = processed > 0 ? cost_hkd / processed : null;
-		const cost_per_1000_hkd = cost_hkd * 1000;
+		const cost_per_1000_hkd = cost_per_record_hkd != null ? cost_per_record_hkd * 1000 : null;
 
 		return NextResponse.json({
 			input_tokens: input,

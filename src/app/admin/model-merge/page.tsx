@@ -71,10 +71,9 @@ export default function ModelMergeAdminPage() {
 		perThousand: number | null;
 		lastSubmitted: string | null;
 	} | null>(null);
+	const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
-	useEffect(() => {
-		fetchBrands().then(setBrands);
-		// fetch unprocessed car count
+	const loadHeading = () => {
 		fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
 			.then((res) => (res.ok ? res.json() : Promise.reject()))
 			.then((data: unknown) => {
@@ -107,6 +106,11 @@ export default function ModelMergeAdminPage() {
 				);
 			})
 			.catch(() => setChatUsage(null));
+	};
+
+	useEffect(() => {
+		fetchBrands().then(setBrands);
+		loadHeading();
 	}, []);
 
 	useEffect(() => {
@@ -187,6 +191,14 @@ export default function ModelMergeAdminPage() {
 				<div className="space-y-3 rounded-3xl border border-slate-200/60 bg-white/80 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.65)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-900/60">
 					<div className="flex flex-wrap items-center gap-3">
 						<h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Model merge</h1>
+						<button
+							type="button"
+							onClick={loadHeading}
+							className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-[12px] font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+						>
+							<span aria-hidden>⟳</span>
+							Refresh
+						</button>
 						{unprocessedCount != null ? (
 							<span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-3)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-1)] ring-1 ring-[color:var(--accent-1)]/30">
 								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-1)]" aria-hidden />
@@ -213,7 +225,7 @@ export default function ModelMergeAdminPage() {
 								{chatUsage.perThousand != null ? (
 									<>
 										<span className="h-1 w-1 rounded-full bg-slate-300" aria-hidden />
-										Cost/1k: {chatUsage.perThousand.toFixed(2)} HKD
+										Cost/1k records: {chatUsage.perThousand.toFixed(2)} HKD
 									</>
 								) : null}
 								{chatUsage.lastSubmitted ? (
@@ -387,6 +399,37 @@ export default function ModelMergeAdminPage() {
 						>
 							Brand check
 						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Process 50 records");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								try {
+									const res = await fetch("/api/create_batch?limit=50", { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Create batch triggered" : "Create batch failed");
+								} catch (error) {
+									setMessage(`Create batch error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-3)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-3)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)]/40 hover:shadow-md"
+						>
+							Process 50
+						</button>
+						<label className="inline-flex items-center gap-2 text-[12px] font-semibold text-slate-700 dark:text-slate-100">
+							<input
+								type="checkbox"
+								checked={showUnassignedOnly}
+								onChange={(e) => setShowUnassignedOnly(e.target.checked)}
+								className="h-4 w-4"
+							/>
+							Show only unassigned
+						</label>
 					</div>
 				</div>
 
@@ -411,14 +454,14 @@ export default function ModelMergeAdminPage() {
 							</tr>
 						</thead>
 						<tbody>
-							{models.map((m, idx) => {
+							{(showUnassignedOnly ? models.filter((m) => !m.group_name) : models).map((m, idx, arr) => {
 								const checked = mergePks.has(m.model_pk);
 								const isTarget = targetPk === m.model_pk;
 								const samePrefix =
 									idx > 0 &&
 									typeof m.model_name === "string" &&
-									typeof models[idx - 1].model_name === "string" &&
-									m.model_name.slice(0, 2).toLowerCase() === models[idx - 1].model_name!.slice(0, 2).toLowerCase();
+									typeof arr[idx - 1]?.model_name === "string" &&
+									m.model_name.slice(0, 2).toLowerCase() === arr[idx - 1].model_name!.slice(0, 2).toLowerCase();
 
 								const zebra = idx % 2 === 0 ? "bg-[color:var(--cell-1)]" : "bg-[color:var(--cell-2)]";
 								const prefixGroupClass = samePrefix
@@ -526,7 +569,7 @@ export default function ModelMergeAdminPage() {
 									</Fragment>
 								);
 							})}
-							{!models.length ? (
+							{!(showUnassignedOnly ? models.filter((m) => !m.group_name).length : models.length) ? (
 								<tr>
 									<td colSpan={14} className="px-3 py-4 text-center text-sm text-slate-500">
 										No models yet for this brand.
@@ -783,6 +826,26 @@ export default function ModelMergeAdminPage() {
 									</option>
 								))}
 							</select>
+							<div className="max-h-48 overflow-auto rounded-lg border border-slate-200/70 bg-white/60 p-2 text-[12px] dark:border-slate-700 dark:bg-slate-900/60">
+								{groupOptions.map((g) => (
+									<label key={g.pk} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[color:var(--cell-3)]">
+										<input
+											type="radio"
+											name="assign-group"
+											checked={assignGroupPk === g.pk}
+											onChange={() => setAssignGroupPk(g.pk)}
+											className="h-4 w-4"
+										/>
+										<div className="min-w-0">
+											<div className="font-semibold text-slate-800 dark:text-slate-100">{g.name}</div>
+											{g.heading ? (
+												<div className="text-[11px] text-slate-600 dark:text-slate-300 truncate">{g.heading}</div>
+											) : null}
+										</div>
+									</label>
+								))}
+								{!groupOptions.length ? <div className="text-[12px] text-slate-500">No groups yet.</div> : null}
+							</div>
 						</div>
 						<div className="flex justify-end gap-3">
 							<button
