@@ -15,6 +15,7 @@ type GroupOption = {
 type ModelRow = {
 	model_pk: number;
 	model_name: string | null;
+	model_slug?: string | null;
 	manu_model_code: string | null;
 	body_type: string | null;
 	power: string | null;
@@ -81,6 +82,7 @@ export default function ModelMergeAdminPage() {
 	} | null>(null);
 	const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 	const [autoModal, setAutoModal] = useState<{ items: Array<{ model_pk: number; model_name: string | null; group_pk: number; group_name: string; keyword: string }> } | null>(null);
+	const [mergeModal, setMergeModal] = useState<{ target: ModelRow; merges: ModelRow[] } | null>(null);
 
 	const loadHeading = () => {
 		fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
@@ -478,6 +480,22 @@ export default function ModelMergeAdminPage() {
 							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-2)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800"
 						>
 							Auto-assign
+						</button>
+						<button
+							type="button"
+							disabled={!mergePks.size || !targetPk}
+							onClick={() => {
+								const target = models.find((m) => m.model_pk === targetPk);
+								const merges = models.filter((m) => mergePks.has(m.model_pk) && m.model_pk !== targetPk);
+								if (!target || !merges.length) {
+									setMessage("Select a target and at least one merge row");
+									return;
+								}
+								setMergeModal({ target, merges });
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-1)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800"
+						>
+							Merge
 						</button>
 						<label className="inline-flex items-center gap-2 text-[12px] font-semibold text-slate-700 dark:text-slate-100">
 							<input
@@ -1234,6 +1252,100 @@ export default function ModelMergeAdminPage() {
 								}}
 							>
 								Confirm & save
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
+
+			{mergeModal ? (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-3xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<div className="text-xs uppercase tracking-wide text-[color:var(--accent-1)]">Merge models</div>
+								<div className="text-sm text-[color:var(--txt-2)]">
+									Target: <span className="font-semibold">{mergeModal.target.model_name || mergeModal.target.model_slug}</span>
+								</div>
+							</div>
+							<button
+								type="button"
+								className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+								onClick={() => setMergeModal(null)}
+								aria-label="Close"
+							>
+								×
+							</button>
+						</div>
+						<div className="max-h-[60vh] overflow-auto rounded-xl border border-slate-200/70 dark:border-slate-800/60">
+							<table className="min-w-full border-collapse text-[11px] sm:text-[12px]">
+								<thead className="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-100">
+									<tr>
+										<th className="border-b px-2 py-1 text-left">Merge?</th>
+										<th className="border-b px-2 py-1 text-left">manu_model_code</th>
+										<th className="border-b px-2 py-1 text-left">model_name</th>
+										<th className="border-b px-2 py-1 text-left">body_type</th>
+									</tr>
+								</thead>
+								<tbody>
+									{mergeModal.merges.map((m) => (
+										<tr key={m.model_pk} className="border-b last:border-b-0">
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.model_pk}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-100">{m.manu_model_code || "—"}</td>
+											<td className="px-2 py-1 text-slate-800 dark:text-slate-100">{m.model_name || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-200">{m.body_type || "—"}</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+								onClick={() => setMergeModal(null)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="rounded-lg border border-[color:var(--accent-1)] bg-[color:var(--accent-1)] px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+								onClick={async () => {
+									if (!mergeModal) return;
+									try {
+										const res = await fetch("/api/models/merge", {
+											method: "POST",
+											headers: { "content-type": "application/json" },
+											body: JSON.stringify({
+												target_model_pk: mergeModal.target.model_pk,
+												merge_model_pks: mergeModal.merges.map((m) => m.model_pk),
+											}),
+										});
+										const data = (await res.json()) as { error?: string };
+										if (!res.ok) {
+											setMessage(data.error || "Merge failed");
+										} else {
+											setMessage("Merged successfully");
+											setModels((prev) =>
+												prev
+													.filter((m) => !mergeModal.merges.some((x) => x.model_pk === m.model_pk))
+													.map((m) =>
+														m.model_pk === mergeModal.target.model_pk
+															? { ...m, listing_count: (m.listing_count ?? 0) + (mergeModal.merges.reduce((acc, cur) => acc + (cur.listing_count ?? 0), 0)) }
+															: m
+													)
+											);
+											setMergePks(new Set());
+											setTargetPk(null);
+										}
+									} catch (error) {
+										setMessage(`Merge error: ${error}`);
+									} finally {
+										setMergeModal(null);
+									}
+								}}
+							>
+								Confirm merge
 							</button>
 						</div>
 					</div>
