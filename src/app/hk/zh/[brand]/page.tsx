@@ -23,6 +23,22 @@ type ModelRow = {
 	power: string | null;
 };
 
+function formatInt(n: number) {
+	try {
+		return new Intl.NumberFormat("en-HK").format(n);
+	} catch {
+		return String(n);
+	}
+}
+
+function yearRange(min: number | null, max: number | null) {
+	if (!min && !max) return "—";
+	if (min && !max) return `${min}–`;
+	if (!min && max) return `–${max}`;
+	if (min === max) return `${min}`;
+	return `${min}–${max}`;
+}
+
 async function loadBrandIntro(brandSlug: string, locale: string): Promise<string | null> {
 	const { env } = await getCloudflareContext({ async: true });
 	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
@@ -78,7 +94,6 @@ async function loadBrandHero(brandSlug: string): Promise<string | null> {
 	const path = result?.content;
 	if (!path) return null;
 	if (path.startsWith("http://") || path.startsWith("https://")) return path;
-	// fallback: prepend CDN host
 	return `https://cdn.328car.com${path}`;
 }
 
@@ -124,25 +139,104 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
 	return result.results ?? [];
 }
 
+function StatPill({ label, value }: { label: string; value: string }) {
+	return (
+		<div
+			className={[
+				"inline-flex items-center gap-2",
+				"rounded-full border border-[color:var(--surface-border)]",
+				"bg-[color:var(--cell-1)] px-4 py-2",
+			].join(" ")}
+		>
+			<span className="text-sm font-semibold tabular-nums text-[color:var(--txt-1)]">{value}</span>
+			<span className="text-xs tracking-[0.18em] uppercase text-[color:var(--txt-3)]">{label}</span>
+		</div>
+	);
+}
+
+function ModelCard({ model }: { model: ModelRow }) {
+	const name = model.model_name || model.model_name_slug || "Unknown model";
+	const years = yearRange(model.min_year, model.max_year);
+	const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
+
+	return (
+		<Link
+			href={href}
+			className={[
+				"group relative block",
+				"rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
+				"p-5 transition",
+				"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
+				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+			].join(" ")}
+		>
+			<div className="space-y-2">
+				<div className="text-xs tracking-[0.18em] uppercase text-[color:var(--txt-3)]">{years}</div>
+
+				<div className="text-lg font-semibold tracking-tight text-[color:var(--txt-1)]">{name}</div>
+
+				<div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--txt-2)]">
+					<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5">
+						{model.power || "—"}
+					</span>
+					<span className="text-[color:var(--txt-3)]">·</span>
+					<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5">
+						{model.manu_model_code || "—"}
+					</span>
+				</div>
+
+				{/* Quiet-luxury price placeholder */}
+				<div className="pt-2">
+					<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+						Start from
+					</div>
+					<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
+						HKD $88,000
+					</div>
+				</div>
+			</div>
+
+			<div
+				className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
+				style={{
+					backgroundColor: "var(--accent-1)",
+					color: "var(--on-accent-1)",
+					border: "1px solid color-mix(in srgb, var(--accent-1) 70%, transparent)",
+				}}
+				aria-label={`${model.listing_count} listings`}
+				title={`${model.listing_count} listings`}
+			>
+				{formatInt(model.listing_count)}
+			</div>
+		</Link>
+	);
+}
+
+
+
 export default async function BrandModelsPage({ params }: { params: Promise<{ brand: string }> }) {
 	const { brand } = await params;
+
 	const [models, intro, story, hero] = await Promise.all([
 		loadBrandModels(brand),
 		loadBrandIntro(brand, "zh_hk"),
 		loadBrandStory(brand, "zh_hk"),
 		loadBrandHero(brand),
 	]);
-	if (!models.length) {
-		notFound();
-	}
+
+	if (!models.length) notFound();
+
 	const brandTitle = models[0]?.name_zh_hk || models[0]?.name_en || brand;
 	const totalListings = models.reduce((acc, m) => acc + (m.listing_count || 0), 0);
+
 	const introText =
 		intro ||
 		"Placeholder blurb about the brand. Add a short highlight on heritage, innovation, and signature models for the Hong Kong market.";
+
 	const storyText =
 		story ||
 		"Add a brand story here. Lead with design/aesthetics, mention hero models, and close with a note on tech/EV direction.";
+
 	const heroImage = hero || null;
 
 	const grouped = new Map<
@@ -151,6 +245,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 			name: string | null;
 			heading: string | null;
 			subheading: string | null;
+			summary: string | null;
 			items: ModelRow[];
 		}
 	>();
@@ -163,6 +258,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 					name: model.group_name,
 					heading: model.group_heading,
 					subheading: model.group_subheading,
+					summary: model.group_summary,
 					items: [],
 				});
 			}
@@ -173,191 +269,166 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 	}
 
 	return (
-		<div className="relative min-h-screen px-6 py-10 text-[color:var(--txt-1)] sm:px-10 lg:px-16">
+		<main className="relative min-h-screen text-[color:var(--txt-1)]">
+			{/* background */}
 			<div
-				className="pointer-events-none fixed inset-0 -z-10"
-				style={{
-					backgroundColor: "var(--bg-1)",
-					backgroundImage: "var(--page-bg-gradient)",
-				}}
+				className="pointer-events-none fixed inset-0 -z-20"
+				style={{ backgroundColor: "var(--bg-1)", backgroundImage: "var(--page-bg-gradient)" }}
 			/>
-			<div className="mx-auto max-w-4xl space-y-6">
-				<div className="space-y-2">
-					<div className="text-xs uppercase tracking-[0.3em] text-[color:var(--txt-3)]">{brand}</div>
-					<div className="flex flex-col gap-4 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5 shadow-[0_18px_32px_-28px_rgba(15,23,42,0.6)] md:flex-row md:items-center md:gap-6">
-						<div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[color:var(--cell-2)] md:h-20 md:w-20">
+
+			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
+				{/* breadcrumb */}
+				<div className="flex items-center justify-center">
+					<nav className="text-xs tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+						<Link href="/" className="hover:text-[color:var(--txt-1)] transition-colors">
+							Home
+						</Link>
+						<span className="mx-2 text-[color:var(--txt-3)]">›</span>
+						<span className="text-[color:var(--txt-2)]">{brandTitle}</span>
+					</nav>
+				</div>
+
+				{/* header */}
+				<header className="mt-10">
+					<div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
+						<div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]">
 							<BrandLogo
 								slug={brand}
 								alt={`${brandTitle} logo`}
-								size={72}
-								className="h-12 w-12 object-contain md:h-14 md:w-14"
+								size={64}
+								className="h-12 w-12 object-contain"
 								priority
 							/>
 						</div>
-						<div className="flex-1 space-y-2">
-							<h1 className="text-3xl font-semibold text-[color:var(--txt-1)] sm:text-4xl">{brandTitle}</h1>
-							<p className="text-sm text-[color:var(--txt-2)] brand-intro1">
+
+						<div className="flex-1 space-y-4">
+							<h1 className="text-4xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-5xl">
+								{brandTitle}
+							</h1>
+
+							<p className="max-w-3xl text-sm leading-relaxed text-[color:var(--txt-2)]">
 								{introText}
 							</p>
-							<div className="flex flex-wrap gap-3 text-xs text-[color:var(--txt-2)]">
-								<span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--accent-3)] px-3 py-1 text-[color:var(--txt-1)]">
-									{models.length} active models
-								</span>
-								<span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--accent-3)] px-3 py-1 text-[color:var(--txt-1)]">
-									{totalListings} total listings (12m)
-								</span>
+
+							<div className="flex flex-wrap gap-3">
+								<StatPill label="Active Models" value={formatInt(models.length)} />
+								<StatPill label="Listings (12 Months)" value={formatInt(totalListings)} />
 							</div>
 						</div>
-						<div className="hidden h-28 w-full overflow-hidden rounded-2xl bg-gradient-to-br from-[color:var(--accent-1)]/10 via-[color:var(--accent-2)]/10 to-transparent md:block md:w-48">
-							<div className="h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.35),transparent_45%),radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.18),transparent_35%)]" />
-						</div>
 					</div>
-					{heroImage ? (
-						<div className="relative overflow-hidden rounded-3xl border border-[color:var(--surface-border)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.7)] bg-[color:var(--cell-1)]">
-							{/* eslint-disable-next-line @next/next/no-img-element */}
+				</header>
+
+				{/* hero */}
+				<section className="mt-10">
+					<div className="overflow-hidden rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]">
+						{heroImage ? (
+							// eslint-disable-next-line @next/next/no-img-element
 							<img
 								src={heroImage}
 								alt={`${brandTitle} hero`}
-								className="h-64 w-full object-cover sm:h-80"
+								className="h-[260px] w-full object-cover sm:h-[360px]"
 								loading="lazy"
 							/>
-						</div>
-					) : null}
-					<div className="grid gap-4">
-						<div className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.5)]">
-							<div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[color:var(--txt-3)]">
-								<span className="h-[1px] w-6 bg-[color:var(--accent-1)]/50" aria-hidden />
-								Brand story
-							</div>
-							<p className="mt-3 text-sm text-[color:var(--txt-2)] brand-story">
-								{storyText}
-							</p>
+						) : (
+							<div
+								className="h-[260px] w-full sm:h-[360px]"
+								style={{
+									background:
+										"radial-gradient(900px 420px at 12% 18%, color-mix(in srgb, var(--accent-1) 22%, transparent), transparent 60%), radial-gradient(900px 420px at 88% 10%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 62%), linear-gradient(to bottom, color-mix(in srgb, var(--cell-2) 85%, transparent), transparent)",
+								}}
+								aria-hidden
+							/>
+						)}
+					</div>
+				</section>
+
+				{/* brand story */}
+				<section className="mt-12">
+					<div className="border-t border-[color:var(--surface-border)] pt-10">
+						<h2 className="text-2xl font-semibold tracking-tight text-[color:var(--txt-1)]">
+							Brand Story
+						</h2>
+						<p className="mt-3 max-w-4xl text-sm leading-relaxed text-[color:var(--txt-2)]">
+							{storyText}
+						</p>
+					</div>
+				</section>
+
+				{/* models */}
+				<section className="mt-12">
+					<div className="border-t border-[color:var(--surface-border)] pt-10">
+						<h2 className="text-2xl font-semibold tracking-tight text-[color:var(--txt-1)]">
+							Our Models
+						</h2>
+
+						<div className="mt-10 space-y-12">
+							{Array.from(grouped.entries()).map(([pk, group]) => (
+								<div key={pk} className="space-y-4">
+									<div className="space-y-2">
+										<div className="text-xs tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+											{group.name || "Series"}
+										</div>
+
+										{group.heading ? (
+											<div className="text-xl font-semibold tracking-tight text-[color:var(--txt-1)]">
+												{group.heading}
+											</div>
+										) : null}
+
+										{group.subheading ? (
+											<div className="text-sm text-[color:var(--txt-2)]">{group.subheading}</div>
+										) : null}
+
+										{group.summary ? (
+											<div className="max-w-4xl text-sm leading-relaxed text-[color:var(--txt-2)]">
+												{group.summary}
+											</div>
+										) : null}
+									</div>
+
+									<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+										{group.items.map((m) => (
+											<ModelCard key={`${pk}-${m.model_name_slug ?? m.model_name ?? "model"}`} model={m} />
+										))}
+									</div>
+								</div>
+							))}
+
+							{ungrouped.length ? (
+								<div className="space-y-4">
+									<div className="text-xs tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+										Other Models
+									</div>
+									<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+										{ungrouped.map((m) => (
+											<ModelCard key={m.model_name_slug ?? m.model_name ?? "model"} model={m} />
+										))}
+									</div>
+								</div>
+							) : null}
 						</div>
 					</div>
-				</div>
+				</section>
 
-				<div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-[color:var(--txt-3)]">
-					<span className="h-[1px] w-10 bg-[color:var(--accent-1)]/50" aria-hidden />
-					Models
-				</div>
-
-				<div className="space-y-6">
-					{Array.from(grouped.entries()).map(([pk, group]) => (
-						<div key={pk} className="space-y-2">
-							<div className="flex flex-col gap-1">
-								<div className="text-xs uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-300">
-									{group.name || "Model group"}
-								</div>
-								{group.heading ? (
-									<div className="text-lg font-semibold text-slate-900 dark:text-slate-50">{group.heading}</div>
-								) : null}
-								{group.subheading ? (
-									<div className="text-sm text-slate-600 dark:text-slate-200">{group.subheading}</div>
-								) : null}
-								{group.items[0]?.group_summary ? (
-									<div className="text-sm text-slate-600 dark:text-slate-200">{group.items[0].group_summary}</div>
-								) : null}
-							</div>
-							<div className="grid gap-4 sm:grid-cols-2">
-								{group.items.map((model) => {
-									const name = model.model_name || model.model_name_slug || "Unknown model";
-									const yearText =
-										model.min_year && model.max_year
-											? model.min_year === model.max_year
-												? `${model.min_year}`
-												: `${model.min_year}–${model.max_year}`
-											: "Years N/A";
-									const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
-									return (
-										<Link
-											key={`${pk}-${model.model_name_slug ?? name}`}
-											href={href}
-											className="group flex items-center justify-between rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-3)] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)]"
-										>
-											<div className="min-w-0">
-												<div className="text-xs uppercase tracking-[0.2em] text-[color:var(--txt-2)]">
-													{yearText}
-												</div>
-												<div className="text-lg font-semibold text-[color:var(--txt-1)]">{name}</div>
-												<div className="text-xs text-[color:var(--txt-2)]">{model.power || "—"} · {model.manu_model_code || "—"}</div>
-											</div>
-											<div
-												className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
-												style={{
-													backgroundColor: "var(--accent-1)",
-													color: "white",
-													border: "1px solid color-mix(in srgb, var(--accent-1) 70%, transparent)",
-												}}
-											>
-												{model.listing_count}
-											</div>
-										</Link>
-									);
-								})}
-							</div>
-						</div>
-					))}
-
-					{ungrouped.length ? (
-						<div className="space-y-3">
-							<div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-500">
-								<span className="h-[1px] w-6 bg-slate-300" aria-hidden />
-								Other models
-							</div>
-							<div className="grid gap-4 sm:grid-cols-2">
-								{ungrouped.map((model) => {
-									const name = model.model_name || model.model_name_slug || "Unknown model";
-									const yearText =
-										model.min_year && model.max_year
-											? model.min_year === model.max_year
-												? `${model.min_year}`
-												: `${model.min_year}–${model.max_year}`
-											: "Years N/A";
-									const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
-									return (
-										<Link
-											key={model.model_name_slug ?? name}
-											href={href}
-											className="group flex items-center justify-between rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)]"
-										>
-											<div className="min-w-0">
-												<div className="text-xs uppercase tracking-[0.2em] text-[color:var(--txt-2)]">
-													{yearText}
-												</div>
-												<div className="text-lg font-semibold text-[color:var(--txt-1)]">{name}</div>
-												<div className="text-xs text-[color:var(--txt-2)]">{model.power || "—"} · {model.manu_model_code || "—"}</div>
-											</div>
-											<div
-												className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold text-white model-count-badge"
-												style={{
-													backgroundColor: "var(--accent-1)",
-													color: "white",
-													border: "1px solid color-mix(in srgb, var(--accent-1) 70%, transparent)",
-												}}
-											>
-												{model.listing_count}
-											</div>
-										</Link>
-									);
-								})}
-							</div>
-						</div>
-					) : null}
-				</div>
-
-				{models.length === 0 ? (
-					<p className="text-sm text-slate-500">No listings found for this brand in the past year.</p>
-				) : null}
-
-				<div>
-					<Link
-						href="/"
-						className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:shadow"
-					>
-						<span aria-hidden>←</span> Back to home
-					</Link>
-				</div>
+				{/* footer */}
+				<footer className="mt-14">
+					<div className="border-t border-[color:var(--surface-border)] pt-8">
+						<Link
+							href="/"
+							className={[
+								"inline-flex items-center gap-2",
+								"rounded-full border border-[color:var(--surface-border)]",
+								"bg-[color:var(--cell-1)] px-5 py-2.5",
+								"text-sm font-medium text-[color:var(--txt-1)]",
+								"transition hover:bg-[color:var(--cell-2)]",
+								"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+							].join(" ")}
+						>
+							<span aria-hidden>←</span> Back to Home
+						</Link>
+					</div>
+				</footer>
 			</div>
-		</div>
+		</main>
 	);
 }

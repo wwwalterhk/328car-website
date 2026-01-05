@@ -1,30 +1,38 @@
 @import "tailwindcss";
 
 :root {
-	--txt-1: #111318;
-	--txt-2: #2f343c;
+	color-scheme: light;
+
+	/* Text */
+	--txt-1: #0f1115;
+	--txt-2: #2a2f37;
 	--txt-3: #6b7280;
 
-	--bg-1: #f6f7fa;
+	/* Page backgrounds */
+	--bg-1: #f7f6f4;
 	--bg-2: #ffffff;
-	--bg-3: #eef1f6;
+	--bg-3: #f0efec;
 
-	--accent-1: #d61f2c;
-	--accent-2: #1d4ed8;
-	--accent-3: #ffe3e6;
+	/* Accents */
+	--accent-1: #8b1c2e;
+	--accent-2: #1f3a8a;
+	--accent-3: #f6e6ea;
 
+	/* Surfaces */
 	--cell-1: #ffffff;
-	--cell-2: #f3f4f6;
-	--cell-3: #e8eef8;
+	--cell-2: #f6f5f2;
+	--cell-3: #eef2f7;
 
+	/* Supporting tokens */
 	--background: var(--bg-1);
 	--foreground: var(--txt-1);
 	--surface: var(--bg-2);
-	--surface-border: rgba(17, 19, 24, 0.08);
-	--page-bg-gradient: radial-gradient(circle at 12% 18%, rgba(214, 31, 44, 0.08), transparent 36%),
-		radial-gradient(circle at 78% 10%, rgba(29, 78, 216, 0.07), transparent 34%),
-		radial-gradient(circle at 60% 72%, rgba(238, 241, 246, 0.5), transparent 30%);
-	color-scheme: light;
+	--surface-border: #e6e3dd;
+	--on-accent-1: #ffffff;
+	--page-bg-gradient:
+		radial-gradient(900px 480px at 12% 8%, rgba(139, 28, 46, 0.08), transparent 60%),
+		radial-gradient(900px 520px at 88% 12%, rgba(31, 58, 138, 0.06), transparent 62%),
+		linear-gradient(to bottom, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
 }
 
 @theme inline {
@@ -36,77 +44,84 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--txt-1: #f9fafb;
-		--txt-2: #d1d5db;
-		--txt-3: #9ca3af;
+		color-scheme: dark;
 
-		--bg-1: #0a0c10;
-		--bg-2: #111827;
-		--bg-3: #1f2937;
+		--txt-1: #f2f3f5;
+		--txt-2: #c9cdd5;
+		--txt-3: #8a93a3;
 
-		--accent-1: #ff3b4d;
-		--accent-2: #3b82f6;
-		--accent-3: #2a1215;
+		--bg-1: #0b0c0f;
+		--bg-2: #101217;
+		--bg-3: #151826;
 
-		--cell-1: #0f172a;
-		--cell-2: #111c33;
-		--cell-3: #1b2a4a;
+		--accent-1: #d24a5a;
+		--accent-2: #4f7cff;
+		--accent-3: #241316;
+
+		--cell-1: #101217;
+		--cell-2: #131622;
+		--cell-3: #171c2a;
 
 		--background: var(--bg-1);
 		--foreground: var(--txt-1);
-		color-scheme: dark;
 		--surface: var(--bg-2);
-		--surface-border: rgba(255, 59, 77, 0.2);
-		--page-bg-gradient: radial-gradient(circle at 12% 18%, rgba(255, 59, 77, 0.12), transparent 38%),
-			radial-gradient(circle at 78% 12%, rgba(59, 130, 246, 0.12), transparent 34%),
-			radial-gradient(circle at 60% 70%, rgba(17, 24, 39, 0.6), transparent 30%);
+		--surface-border: #232836;
+		--on-accent-1: #ffffff;
+		--page-bg-gradient:
+			radial-gradient(900px 480px at 12% 8%, rgba(210, 74, 90, 0.12), transparent 60%),
+			radial-gradient(900px 520px at 88% 12%, rgba(79, 124, 255, 0.1), transparent 62%),
+			linear-gradient(to bottom, rgba(16, 18, 23, 0.75), rgba(11, 12, 15, 0));
 	}
 }
 
 .theme-light {
-	--txt-1: #111318;
-	--txt-2: #2f343c;
+	color-scheme: light;
+	--txt-1: #0f1115;
+	--txt-2: #2a2f37;
 	--txt-3: #6b7280;
-	--bg-1: #f6f7fa;
+	--bg-1: #f7f6f4;
 	--bg-2: #ffffff;
-	--bg-3: #eef1f6;
-	--accent-1: #d61f2c;
-	--accent-2: #1d4ed8;
-	--accent-3: #ffe3e6;
+	--bg-3: #f0efec;
+	--accent-1: #8b1c2e;
+	--accent-2: #1f3a8a;
+	--accent-3: #f6e6ea;
 	--cell-1: #ffffff;
-	--cell-2: #f3f4f6;
-	--cell-3: #e8eef8;
+	--cell-2: #f6f5f2;
+	--cell-3: #eef2f7;
 	--background: var(--bg-1);
 	--foreground: var(--txt-1);
 	--surface: var(--bg-2);
-	--surface-border: rgba(17, 19, 24, 0.08);
-	--page-bg-gradient: radial-gradient(circle at 12% 18%, rgba(214, 31, 44, 0.08), transparent 36%),
-		radial-gradient(circle at 78% 10%, rgba(29, 78, 216, 0.07), transparent 34%),
-		radial-gradient(circle at 60% 72%, rgba(238, 241, 246, 0.5), transparent 30%);
-	color-scheme: light;
+	--surface-border: #e6e3dd;
+	--on-accent-1: #ffffff;
+	--page-bg-gradient:
+		radial-gradient(900px 480px at 12% 8%, rgba(139, 28, 46, 0.08), transparent 60%),
+		radial-gradient(900px 520px at 88% 12%, rgba(31, 58, 138, 0.06), transparent 62%),
+		linear-gradient(to bottom, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
 }
 
 .theme-dark {
-	--txt-1: #f9fafb;
-	--txt-2: #d1d5db;
-	--txt-3: #9ca3af;
-	--bg-1: #0a0c10;
-	--bg-2: #111827;
-	--bg-3: #1f2937;
-	--accent-1: #ff3b4d;
-	--accent-2: #3b82f6;
-	--accent-3: #2a1215;
-	--cell-1: #0f172a;
-	--cell-2: #111c33;
-	--cell-3: #1b2a4a;
+	color-scheme: dark;
+	--txt-1: #f2f3f5;
+	--txt-2: #c9cdd5;
+	--txt-3: #8a93a3;
+	--bg-1: #0b0c0f;
+	--bg-2: #101217;
+	--bg-3: #151826;
+	--accent-1: #d24a5a;
+	--accent-2: #4f7cff;
+	--accent-3: #241316;
+	--cell-1: #101217;
+	--cell-2: #131622;
+	--cell-3: #171c2a;
 	--background: var(--bg-1);
 	--foreground: var(--txt-1);
 	--surface: var(--bg-2);
-	--surface-border: rgba(255, 59, 77, 0.2);
-	--page-bg-gradient: radial-gradient(circle at 12% 18%, rgba(255, 59, 77, 0.12), transparent 38%),
-		radial-gradient(circle at 78% 12%, rgba(59, 130, 246, 0.12), transparent 34%),
-		radial-gradient(circle at 60% 70%, rgba(17, 24, 39, 0.6), transparent 30%);
-	color-scheme: dark;
+	--surface-border: #232836;
+	--on-accent-1: #ffffff;
+	--page-bg-gradient:
+		radial-gradient(900px 480px at 12% 8%, rgba(210, 74, 90, 0.12), transparent 60%),
+		radial-gradient(900px 520px at 88% 12%, rgba(79, 124, 255, 0.1), transparent 62%),
+		linear-gradient(to bottom, rgba(16, 18, 23, 0.75), rgba(11, 12, 15, 0));
 }
 
 .theme-surface {
