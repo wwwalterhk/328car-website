@@ -3,7 +3,15 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 type Brand = { slug: string; name_en: string | null; name_zh_hk: string | null };
-type GroupOption = { pk: number; slug: string; name: string; heading?: string | null; subheading?: string | null; summary?: string | null };
+type GroupOption = {
+	pk: number;
+	slug: string;
+	name: string;
+	heading?: string | null;
+	subheading?: string | null;
+	summary?: string | null;
+	keywords?: string | null;
+};
 type ModelRow = {
 	model_pk: number;
 	model_name: string | null;
@@ -56,7 +64,7 @@ export default function ModelMergeAdminPage() {
 	const [assignGroupPk, setAssignGroupPk] = useState<number | null>(null);
 	const [editModalOpen, setEditModalOpen] = useState(false);
 	const [editGroupPk, setEditGroupPk] = useState<number | null>(null);
-	const [editForm, setEditForm] = useState({ group_name: "", heading: "", subheading: "", summary: "" });
+	const [editForm, setEditForm] = useState({ group_name: "", heading: "", subheading: "", summary: "", keywords: "" });
 	const [apiResult, setApiResult] = useState<string | null>(null);
 	const [consoleOpen, setConsoleOpen] = useState(false);
 	const [consoleTitle, setConsoleTitle] = useState<string>("Status");
@@ -72,6 +80,7 @@ export default function ModelMergeAdminPage() {
 		lastSubmitted: string | null;
 	} | null>(null);
 	const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
+	const [autoModal, setAutoModal] = useState<{ items: Array<{ model_pk: number; model_name: string | null; group_pk: number; group_name: string; keyword: string }> } | null>(null);
 
 	const loadHeading = () => {
 		fetch("/api/car_listings?action=unprocessed-count", { cache: "no-store" })
@@ -140,6 +149,7 @@ export default function ModelMergeAdminPage() {
 						heading: (g as { heading?: string }).heading ?? null,
 						subheading: (g as { subheading?: string }).subheading ?? null,
 						summary: (g as { summary?: string }).summary ?? null,
+						keywords: (g as { keywords?: string }).keywords ?? null,
 					})) ?? [];
 				setGroupOptions(opts.filter((g) => g.pk > 0));
 			})
@@ -284,6 +294,7 @@ export default function ModelMergeAdminPage() {
 									heading: first?.heading ?? "",
 									subheading: first?.subheading ?? "",
 									summary: first?.summary ?? "",
+									keywords: first?.keywords ?? "",
 								});
 								setEditModalOpen(true);
 							}}
@@ -421,6 +432,53 @@ export default function ModelMergeAdminPage() {
 						>
 							Process 50
 						</button>
+						<button
+							type="button"
+							disabled={!models.length || !groupOptions.length}
+							onClick={() => {
+								const unassigned = models.filter((m) => !m.group_name);
+								const suggestions: Array<{
+									model_pk: number;
+									model_name: string | null;
+									group_pk: number;
+									group_name: string;
+									keyword: string;
+								}> = [];
+								const claimed = new Set<number>();
+								groupOptions
+									.filter((g) => g.keywords)
+									.forEach((g) => {
+										const keywords = (g.keywords || "")
+											.split(",")
+											.map((k) => k.trim().toLowerCase())
+											.filter(Boolean);
+										if (!keywords.length) return;
+										unassigned.forEach((m) => {
+											if (claimed.has(m.model_pk)) return;
+											const name = (m.model_name || "").toLowerCase();
+											const hit = keywords.find((k) => name.includes(k));
+											if (hit) {
+												claimed.add(m.model_pk);
+												suggestions.push({
+													model_pk: m.model_pk,
+													model_name: m.model_name,
+													group_pk: g.pk,
+													group_name: g.name,
+													keyword: hit,
+												});
+											}
+										});
+									});
+								if (!suggestions.length) {
+									setMessage("No auto-assign suggestions found");
+									return;
+								}
+								setAutoModal({ items: suggestions });
+							}}
+							className="inline-flex items-center justify-center rounded-lg border border-[color:var(--accent-2)] bg-white px-3 py-2 text-[12px] font-semibold text-[color:var(--accent-2)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-3)] hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800"
+						>
+							Auto-assign
+						</button>
 						<label className="inline-flex items-center gap-2 text-[12px] font-semibold text-slate-700 dark:text-slate-100">
 							<input
 								type="checkbox"
@@ -434,6 +492,28 @@ export default function ModelMergeAdminPage() {
 				</div>
 
 				<div className="overflow-auto rounded-2xl border border-slate-200/70 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.6)] theme-surface">
+					{showUnassignedOnly && groupOptions.length ? (
+						<div className="flex flex-wrap items-center gap-2 border-b border-slate-200/70 bg-white/70 px-3 py-2 text-[11px] font-semibold text-[color:var(--txt-2)] dark:border-slate-800/60 dark:bg-slate-900/60">
+							<span className="text-[color:var(--txt-1)]">Assign to:</span>
+							{groupOptions
+								.slice()
+								.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+								.map((g) => (
+									<button
+										key={g.pk}
+										type="button"
+										onClick={() => setAssignGroupPk(g.pk)}
+										className={`rounded-full border px-3 py-1 transition ${
+											assignGroupPk === g.pk
+												? "border-[color:var(--accent-2)] bg-[color:var(--accent-3)] text-[color:var(--accent-2)]"
+												: "border-slate-200 bg-white text-[color:var(--txt-2)] hover:border-[color:var(--accent-2)] hover:text-[color:var(--accent-2)] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+										}`}
+									>
+										{g.name}
+									</button>
+								))}
+						</div>
+					) : null}
 					<table className="min-w-full border-collapse text-[11px] sm:text-[12px]">
 						<thead className="sticky top-0 z-10 bg-gradient-to-r from-slate-50 to-slate-100 text-slate-700 shadow-sm dark:from-slate-800 dark:to-slate-900 dark:text-slate-50">
 							<tr>
@@ -827,8 +907,14 @@ export default function ModelMergeAdminPage() {
 								))}
 							</select>
 							<div className="max-h-48 overflow-auto rounded-lg border border-slate-200/70 bg-white/60 p-2 text-[12px] dark:border-slate-700 dark:bg-slate-900/60">
-								{groupOptions.map((g) => (
-									<label key={g.pk} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-[color:var(--cell-3)]">
+								{groupOptions
+									.slice()
+									.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+									.map((g) => (
+										<label
+											key={g.pk}
+											className="flex cursor-pointer items-center gap-2 rounded px-3 py-2 hover:bg-[color:var(--cell-3)]"
+										>
 										<input
 											type="radio"
 											name="assign-group"
@@ -843,7 +929,7 @@ export default function ModelMergeAdminPage() {
 											) : null}
 										</div>
 									</label>
-								))}
+									))}
 								{!groupOptions.length ? <div className="text-[12px] text-slate-500">No groups yet.</div> : null}
 							</div>
 						</div>
@@ -925,6 +1011,7 @@ export default function ModelMergeAdminPage() {
 											heading: selected?.heading ?? "",
 											subheading: selected?.subheading ?? "",
 											summary: selected?.summary ?? "",
+											keywords: selected?.keywords ?? "",
 										});
 									}}
 								>
@@ -967,6 +1054,14 @@ export default function ModelMergeAdminPage() {
 									rows={3}
 									value={editForm.summary}
 									onChange={(e) => setEditForm((prev) => ({ ...prev, summary: e.target.value }))}
+								/>
+							</div>
+							<div>
+								<label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Keywords</label>
+								<input
+									className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-[13px] text-slate-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-700/40"
+									value={editForm.keywords}
+									onChange={(e) => setEditForm((prev) => ({ ...prev, keywords: e.target.value }))}
 								/>
 							</div>
 						</div>
@@ -1029,11 +1124,11 @@ export default function ModelMergeAdminPage() {
 				</div>
 				) : null}
 
-				{consoleOpen ? (
-					<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
-						<div className="w-full max-w-2xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
-							<div className="flex items-center justify-between gap-3">
-								<div>
+			{consoleOpen ? (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-2xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
 									<div className="text-xs uppercase tracking-wide text-[color:var(--accent-2)]">{consoleTitle}</div>
 									<div className="text-sm text-[color:var(--txt-2)]">
 										{apiLoading ? "Working..." : apiResult ? "Done" : "Ready"}
@@ -1052,10 +1147,98 @@ export default function ModelMergeAdminPage() {
 								{apiLoading ? <div className="text-sm text-[color:var(--accent-1)]">Loading…</div> : null}
 								{apiResult ? <pre className="whitespace-pre-wrap text-[11px]">{apiResult}</pre> : null}
 								{!apiLoading && !apiResult ? <div className="text-sm text-slate-500">No output yet.</div> : null}
-							</div>
 						</div>
 					</div>
-				) : null}
-			</div>
+				</div>
+			) : null}
+
+			{autoModal ? (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur">
+					<div className="w-full max-w-3xl space-y-3 rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-2xl backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/90">
+						<div className="flex items-center justify-between gap-3">
+							<div>
+								<div className="text-xs uppercase tracking-wide text-[color:var(--accent-2)]">Auto-assign suggestions</div>
+								<div className="text-sm text-[color:var(--txt-2)]">
+									{autoModal.items.length} matches found. Confirm to assign groups.
+								</div>
+							</div>
+							<button
+								type="button"
+								className="h-9 w-9 rounded-full border border-slate-200 text-lg text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+								onClick={() => setAutoModal(null)}
+								aria-label="Close"
+							>
+								×
+							</button>
+						</div>
+						<div className="max-h-[60vh] overflow-auto rounded-xl border border-slate-200/70 dark:border-slate-800/60">
+							<table className="min-w-full border-collapse text-[11px] sm:text-[12px]">
+								<thead className="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-100">
+									<tr>
+										<th className="border-b px-2 py-1 text-left">Model</th>
+										<th className="border-b px-2 py-1 text-left">Group</th>
+										<th className="border-b px-2 py-1 text-left">Keyword</th>
+									</tr>
+								</thead>
+								<tbody>
+									{autoModal.items.map((item) => (
+										<tr key={`${item.model_pk}-${item.group_pk}`} className="border-b last:border-b-0">
+											<td className="px-2 py-1 text-slate-800 dark:text-slate-100">{item.model_name || "—"}</td>
+											<td className="px-2 py-1 text-slate-700 dark:text-slate-200">{item.group_name}</td>
+											<td className="px-2 py-1 text-slate-500 dark:text-slate-300">{item.keyword}</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+								onClick={() => setAutoModal(null)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="rounded-lg border border-[color:var(--accent-2)] bg-[color:var(--accent-2)] px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+								onClick={async () => {
+									if (!autoModal) return;
+									const grouped = new Map<number, number[]>();
+									autoModal.items.forEach((item) => {
+										const list = grouped.get(item.group_pk) ?? [];
+										list.push(item.model_pk);
+										grouped.set(item.group_pk, list);
+									});
+									try {
+										for (const [groupPk, modelPks] of grouped.entries()) {
+											await fetch("/api/model-groups", {
+												method: "PATCH",
+												headers: { "content-type": "application/json" },
+												body: JSON.stringify({ model_groups_pk: groupPk, model_pks: modelPks }),
+											});
+										}
+										setModels((prev) =>
+											prev.map((m) => {
+												const hit = autoModal.items.find((i) => i.model_pk === m.model_pk);
+												if (hit) return { ...m, group_name: hit.group_name };
+												return m;
+											})
+										);
+										setMessage("Auto-assign completed");
+									} catch (error) {
+										setMessage(`Auto-assign error: ${error}`);
+									} finally {
+										setAutoModal(null);
+									}
+								}}
+							>
+								Confirm & save
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
+		</div>
 	);
 }

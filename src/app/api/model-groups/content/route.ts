@@ -171,7 +171,7 @@ function buildRequest(row: Row, model: string) {
 
 Tone: premium, modern, controlled, visual; avoid slogans and exaggeration.
 
-Output: {"heading":"heading in 3-12 chars, no model name", subheading:"exactly 2-3 sentences (no title, no bullets), 70–110 Chinese characters total"}`;
+Output: {"heading":"heading in 3-12 chars, no model name", subheading:"exactly 2-3 sentences (no title, no bullets), 70–110 Chinese characters total", "keywords":"comma-separated english simple model name keywords, no spaces, max 15 keywords, to search and assign the model for system, e.g. 320i, 458, clubman, Freed, Civic etc."}`;
 
 	return {
 		custom_id: `model_group_content::${row.brand_slug}::${row.group_slug}`,
@@ -252,8 +252,13 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 		: null;
 
 	const parsed = outputTextFile ? parseJsonl(outputTextFile) : [];
-	const results: Array<{ brand_slug: string; group_slug: string; heading: string | null; subheading: string | null }> =
-		[];
+	const results: Array<{
+		brand_slug: string;
+		group_slug: string;
+		heading: string | null;
+		subheading: string | null;
+		keywords: string | null;
+	}> = [];
 
 	for (const line of parsed) {
 		const customId = typeof line.custom_id === "string" ? line.custom_id : "";
@@ -274,8 +279,14 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 		}
 
 		await db
-			.prepare(`UPDATE model_groups SET heading = COALESCE(?, heading), subheading = COALESCE(?, subheading) WHERE brand_slug = ? AND group_slug = ?`)
-			.bind(parsedText.heading ?? null, parsedText.subheading ?? null, brand_slug, group_slug)
+			.prepare(
+				`UPDATE model_groups
+         SET heading = COALESCE(?, heading),
+             subheading = COALESCE(?, subheading),
+             keywords = COALESCE(?, keywords)
+         WHERE brand_slug = ? AND group_slug = ?`
+			)
+			.bind(parsedText.heading ?? null, parsedText.subheading ?? null, parsedText.keywords ?? null, brand_slug, group_slug)
 			.run();
 
 		await db
@@ -287,7 +298,13 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 			.bind(JSON.stringify(body ?? {}), batchId, customId)
 			.run();
 
-		results.push({ brand_slug, group_slug, heading: parsedText.heading ?? null, subheading: parsedText.subheading ?? null });
+		results.push({
+			brand_slug,
+			group_slug,
+			heading: parsedText.heading ?? null,
+			subheading: parsedText.subheading ?? null,
+			keywords: parsedText.keywords ?? null,
+		});
 	}
 
 	await db
@@ -332,23 +349,32 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 	return { ok: true, status, summary_status, batch_id: batchId, results, errors };
 }
 
-function parseHeadingSubheading(text: string): { heading: string | null; subheading: string | null } {
+function parseHeadingSubheading(text: string): { heading: string | null; subheading: string | null; keywords: string | null } {
 	const trimmed = text.trim();
 	let heading: string | null = null;
 	let subheading: string | null = null;
-	if (!trimmed) return { heading: null, subheading: null };
-	const parsed = safeJsonParse<{ heading?: unknown; subheading?: unknown }>(trimmed);
+	let keywords: string | null = null;
+	if (!trimmed) return { heading: null, subheading: null, keywords: null };
+	const parsed = safeJsonParse<{ heading?: unknown; subheading?: unknown; keywords?: unknown }>(trimmed);
 	if (parsed) {
 		if (typeof parsed.heading === "string") heading = parsed.heading.trim();
 		if (typeof parsed.subheading === "string") subheading = parsed.subheading.trim();
-		if (heading || subheading) return { heading: heading || null, subheading: subheading || null };
+		if (typeof parsed.keywords === "string") keywords = parsed.keywords.trim();
+		else if (Array.isArray(parsed.keywords)) {
+			const joined = parsed.keywords
+				.map((k) => (typeof k === "string" ? k.trim() : ""))
+				.filter(Boolean)
+				.join(",");
+			keywords = joined || null;
+		}
+		if (heading || subheading || keywords) return { heading: heading || null, subheading: subheading || null, keywords };
 	}
 	// Fallback: treat first line as heading (short) and remainder as subheading
 	const [first, ...rest] = trimmed.split("\n").map((s) => s.trim()).filter(Boolean);
 	if (first) heading = first.length <= 12 ? first : first.slice(0, 12);
 	if (rest.length) subheading = rest.join(" ").trim();
 	else if (!heading) subheading = trimmed;
-	return { heading: heading || null, subheading: subheading || null };
+	return { heading: heading || null, subheading: subheading || null, keywords: null };
 }
 
 function parseCustomId(customId: string): { brand_slug: string | null; group_slug: string | null } {

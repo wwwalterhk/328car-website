@@ -133,6 +133,8 @@ CREATE INDEX IF NOT EXISTS idx_models_brand_code
 
 CREATE INDEX IF NOT EXISTS idx_models_model_name_slug ON models (model_name_slug);
 
+CREATE INDEX IF NOT EXISTS idx_models_model_groups_pk ON models(model_groups_pk);
+
 
 -- Model info content (per locale)
 CREATE TABLE IF NOT EXISTS models_item (
@@ -155,6 +157,7 @@ CREATE TABLE IF NOT EXISTS model_groups (
   heading TEXT,
   subheading TEXT,
   summary TEXT,
+  keywords TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (brand_slug, group_slug)
 );

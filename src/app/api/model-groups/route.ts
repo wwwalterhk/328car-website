@@ -12,12 +12,12 @@ export async function GET(request: NextRequest) {
 
 	try {
 		const result = await db
-			.prepare(
-				`SELECT model_groups_pk, brand_slug, group_slug, group_name, heading, subheading, summary
-         FROM model_groups
-         WHERE brand_slug = ?
-         ORDER BY group_name`
-			)
+		.prepare(
+			`SELECT model_groups_pk, brand_slug, group_slug, group_name, heading, subheading, summary, keywords
+     FROM model_groups
+     WHERE brand_slug = ?
+     ORDER BY group_name`
+		)
 			.bind(brand)
 			.all<Record<string, unknown>>();
 		return NextResponse.json({ ok: true, groups: result.results ?? [] });
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 		heading?: unknown;
 		subheading?: unknown;
 		summary?: unknown;
+		keywords?: unknown;
 	};
 
 	const brandSlug = typeof record.brand_slug === "string" ? record.brand_slug.trim() : "";
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
 	const heading = typeof record.heading === "string" ? record.heading.trim() : null;
 	const subheading = typeof record.subheading === "string" ? record.subheading.trim() : null;
 	const summary = typeof record.summary === "string" ? record.summary.trim() : null;
+	const keywords = typeof (record as { keywords?: unknown }).keywords === "string" ? (record as { keywords: string }).keywords.trim() : null;
 
 	if (!brandSlug || !groupSlug || !groupName) {
 		return NextResponse.json(
@@ -69,10 +71,10 @@ export async function POST(request: NextRequest) {
 	try {
 		const result = await db
 			.prepare(
-				`INSERT INTO model_groups (brand_slug, group_slug, group_name, heading, subheading, summary)
-         VALUES (?, ?, ?, ?, ?, ?)`
+				`INSERT INTO model_groups (brand_slug, group_slug, group_name, heading, subheading, summary, keywords)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
 			)
-			.bind(brandSlug, groupSlug, groupName, heading, subheading, summary)
+			.bind(brandSlug, groupSlug, groupName, heading, subheading, summary, keywords)
 			.run();
 
 		return NextResponse.json({
@@ -155,6 +157,7 @@ export async function PUT(request: NextRequest) {
 	const heading = typeof record.heading === "string" ? record.heading.trim() : null;
 	const subheading = typeof record.subheading === "string" ? record.subheading.trim() : null;
 	const summary = typeof record.summary === "string" ? record.summary.trim() : null;
+	const keywords = typeof (record as { keywords?: unknown }).keywords === "string" ? (record as { keywords: string }).keywords.trim() : null;
 
 	const { env } = await getCloudflareContext({ async: true });
 	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
@@ -167,10 +170,11 @@ export async function PUT(request: NextRequest) {
          SET group_name = COALESCE(?, group_name),
              heading = ?,
              subheading = ?,
-             summary = ?
+             summary = ?,
+             keywords = COALESCE(?, keywords)
          WHERE model_groups_pk = ?`
 			)
-			.bind(groupName, heading, subheading, summary, pk)
+			.bind(groupName, heading, subheading, summary, keywords, pk)
 			.run();
 		return NextResponse.json({ ok: true, updated: result.meta?.changes ?? 0 });
 	} catch (error) {
