@@ -29,6 +29,8 @@
 	--surface: var(--bg-2);
 	--surface-border: #e6e3dd;
 	--on-accent-1: #ffffff;
+	--overlay: rgba(10, 11, 13, 0.42);
+	--shadow-elev-1: 0 26px 70px -40px rgba(15, 23, 42, 0.35);
 	--page-bg-gradient:
 		radial-gradient(900px 480px at 12% 8%, rgba(139, 28, 46, 0.08), transparent 60%),
 		radial-gradient(900px 520px at 88% 12%, rgba(31, 58, 138, 0.06), transparent 62%),
@@ -67,6 +69,8 @@
 		--surface: var(--bg-2);
 		--surface-border: #232836;
 		--on-accent-1: #ffffff;
+		--overlay: rgba(0, 0, 0, 0.7);
+		--shadow-elev-1: 0 26px 70px -40px rgba(0, 0, 0, 0.65);
 		--page-bg-gradient:
 			radial-gradient(900px 480px at 12% 8%, rgba(210, 74, 90, 0.12), transparent 60%),
 			radial-gradient(900px 520px at 88% 12%, rgba(79, 124, 255, 0.1), transparent 62%),

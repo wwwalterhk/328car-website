@@ -2,7 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import BrandLogo from "@/app/components/brand-logo";
-
+import ModelGroupHeader from "@/app/components/model-group-header";
 export const dynamic = "force-dynamic";
 
 type ModelRow = {
@@ -381,28 +381,12 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 								.sort((a, b) => (a[1].name || "").localeCompare(b[1].name || ""))
 								.map(([pk, group]) => (
 								<div key={pk} className="space-y-4">
-									<div className="space-y-2">
-										<div className="text-xs tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
-											{group.name || "Series"}
-										</div>
-
-										{group.heading ? (
-											<div className="text-xl font-semibold tracking-tight text-[color:var(--txt-1)]">
-												{group.heading}
-											</div>
-										) : null}
-
-										{group.subheading ? (
-											<div className="text-sm text-[color:var(--txt-2)]">{group.subheading}</div>
-										) : null}
-
-										{group.summary ? (
-											<div className="max-w-4xl text-sm leading-relaxed text-[color:var(--txt-2)]">
-												{group.summary}
-											</div>
-										) : null}
-									</div>
-
+									<ModelGroupHeader
+									name={group.name}
+									heading={group.heading}
+									subheading={group.subheading}
+									summary={group.summary}
+									/>
 									<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 										{group.items.map((m) => (
 											<ModelCard key={`${pk}-${m.model_name_slug ?? m.model_name ?? "model"}`} model={m} />
