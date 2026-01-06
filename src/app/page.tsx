@@ -1,4 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import Link from "next/link";
 import AuthStatus from "@/app/components/auth-status";
 import BrandLogo from "@/app/components/brand-logo";
 
@@ -58,12 +59,12 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         c.sts = 1
         AND c.model_sts = 1
         AND c.last_update_datetime > datetime('now', '-1 year')
-  		AND m.power != 'electric'
+        AND m.power != 'electric'
       GROUP BY
         m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
       ORDER BY listing_count DESC`
-	)
-	.all<ModelRow>();
+		)
+		.all<ModelRow>();
 
 	return result.results ?? [];
 }
@@ -98,8 +99,7 @@ async function loadElectricModelsSummary(): Promise<ModelRow[]> {
 		)
 		.all<ModelRow>();
 
-	const models = result.results ?? [];
-	return models;
+	return result.results ?? [];
 }
 
 async function loadClassicModelsSummary(): Promise<ModelRow[]> {
@@ -150,6 +150,153 @@ function toSlug(value: string | null): string | null {
 	return slug || null;
 }
 
+function yearRange(min: number | null, max: number | null) {
+	if (!min && !max) return "—";
+	if (min && !max) return `${min}–`;
+	if (!min && max) return `–${max}`;
+	if (min === max) return `${min}`;
+	return `${min}–${max}`;
+}
+
+function formatInt(n: number) {
+	try {
+		return new Intl.NumberFormat("en-HK").format(n);
+	} catch {
+		return String(n);
+	}
+}
+
+function SectionPill({ children }: { children: React.ReactNode }) {
+	return (
+		<div
+			className={[
+				"inline-flex w-fit items-center gap-2",
+				"rounded-full border border-[color:var(--surface-border)]",
+				"bg-[color:var(--cell-1)] px-4 py-2",
+				"text-[11px] font-semibold uppercase tracking-[0.28em]",
+				"text-[color:var(--txt-2)]",
+			].join(" ")}
+		>
+			{children}
+		</div>
+	);
+}
+
+function SectionHeader({
+	pill,
+	title,
+	subtitle,
+	countLabel,
+}: {
+	pill: string;
+	title: string;
+	subtitle: string;
+	countLabel?: string;
+}) {
+	return (
+		<div className="space-y-6">
+			<SectionPill>{pill}</SectionPill>
+
+			<div className="space-y-3">
+				<h2 className="text-2xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-3xl">
+					{title}
+				</h2>
+				<p className="max-w-2xl text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">
+					{subtitle}
+				</p>
+			</div>
+
+			{countLabel ? (
+				<div className="flex items-center gap-3 text-xs uppercase tracking-[0.26em] text-[color:var(--txt-3)]">
+					<span className="h-px w-10 bg-[color:var(--surface-border)]" aria-hidden />
+					{countLabel}
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) {
+	const modelLabel = model.model_name || "Unknown model";
+	const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
+	const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
+	const href = `/hk/zh/${model.brand_slug}/${modelNameSlug || ""}`;
+	const years = yearRange(model.min_year, model.max_year);
+
+	return (
+		<Link
+			key={`${model.brand_slug}-${model.model_name_slug ?? model.model_name ?? "model"}`}
+			href={href}
+			className={[
+				"group relative block",
+				"rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
+				"p-5 transition",
+				"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
+				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+				"shadow-[var(--shadow-elev-1)]",
+			].join(" ")}
+		>
+			<div className="flex items-start justify-between gap-4">
+				<div className="flex min-w-0 items-start gap-4">
+					<div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
+						<BrandLogo
+							slug={model.brand_slug}
+							alt={`${brandLabel} logo`}
+							size={32}
+							className="h-8 w-8 object-contain"
+						/>
+					</div>
+
+					<div className="min-w-0">
+						<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+							{brandLabel}
+						</div>
+
+						<div className="mt-1 truncate text-lg font-semibold tracking-tight text-[color:var(--txt-1)]">
+							{modelLabel}
+						</div>
+
+						<div className="mt-1 text-xs text-[color:var(--txt-2)]">
+							<span className="text-[color:var(--txt-3)]">{model.brand_slug}</span>
+							<span className="mx-2 text-[color:var(--txt-3)]">·</span>
+							<span className="text-[color:var(--txt-2)]">{years}</span>
+							{tagLabel ? (
+								<>
+									<span className="mx-2 text-[color:var(--txt-3)]">·</span>
+									<span className="text-[color:var(--txt-3)]">{tagLabel}</span>
+								</>
+							) : null}
+						</div>
+
+						{/* Quiet-luxury placeholder pricing */}
+						<div className="mt-4">
+							<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+								Start from
+							</div>
+							<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
+								HKD $88,000
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div
+					className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
+					style={{
+						backgroundColor: "var(--accent-1)",
+						color: "var(--on-accent-1)",
+						border: "1px solid color-mix(in srgb, var(--accent-1) 70%, transparent)",
+					}}
+					aria-label={`${model.listing_count} listings`}
+					title={`${model.listing_count} listings`}
+				>
+					{formatInt(model.listing_count)}
+				</div>
+			</div>
+		</Link>
+	);
+}
+
 export default async function Home() {
 	const [electricModels, traditionalModels, classicModels, brands] = await Promise.all([
 		loadElectricModelsSummary(),
@@ -157,299 +304,186 @@ export default async function Home() {
 		loadClassicModelsSummary(),
 		loadBrands(),
 	]);
+
 	const electricTop = electricModels.slice(0, 12);
 	const traditionalTop = traditionalModels.slice(0, 12);
 	const classicTop = classicModels.slice(0, 12);
 	const totalModels = electricTop.length + traditionalTop.length + classicTop.length;
 
 	return (
-		<div className="relative min-h-screen px-6 py-12 text-slate-900 sm:px-10 lg:px-16">
+		<main className="relative min-h-screen text-[color:var(--txt-1)]">
 			<div
 				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
-					backgroundColor: "var(--background)",
+					backgroundColor: "var(--bg-1)",
 					backgroundImage: "var(--page-bg-gradient)",
 				}}
 			/>
-			<main className="mx-auto max-w-6xl">
-				<section className="flex flex-col gap-6">
-					<div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-900/10 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-700">
-						In Stock
-					</div>
+
+			{/* Match brand page container exactly */}
+			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
+				{/* HERO */}
+				<section className="space-y-6">
+					<SectionPill>In Stock</SectionPill>
+
 					<div className="space-y-3">
-						<h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
+						<h1 className="text-3xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
 							Latest models with active inventory
 						</h1>
-						<p className="max-w-2xl text-sm text-slate-600 sm:text-base">
-							Shop what is available now. Listings are refreshed and ranked by the most active
-							models in the last 12 months.
+						<p className="max-w-2xl text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">
+							Shop what is available now. Listings are refreshed and ranked by the most active models in the
+							last 12 months.
 						</p>
 					</div>
+
 					<div>
 						<AuthStatus />
 					</div>
-					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-500">
-						<span className="h-[1px] w-10 bg-slate-300" aria-hidden />
+
+					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.26em] text-[color:var(--txt-3)]">
+						<span className="h-px w-10 bg-[color:var(--surface-border)]" aria-hidden />
 						{totalModels} models
 					</div>
 				</section>
 
-				<section className="mt-10 space-y-4">
-					<div className="space-y-1">
-						<h2 className="text-xl font-semibold text-slate-900">Electric models</h2>
-						<p className="text-sm text-slate-600">
-							EV and plug-in models with active listings in the past 12 months.
-						</p>
-					</div>
-					<div className="grid gap-4 md:grid-cols-3 electric-car-list">
-					{electricTop.map((model) => {
-						const modelLabel = model.model_name || "Unknown model";
-						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
-						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
-						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
-						const yearText =
-							model.min_year && model.max_year
-								? model.min_year === model.max_year
-									? `${model.min_year}`
-									: `${model.min_year}–${model.max_year}`
-								: "Years N/A";
+				{/* ELECTRIC */}
+				<section className="mt-12 border-t border-[color:var(--surface-border)] pt-10">
+					<SectionHeader
+						pill="Electric"
+						title="Electric models"
+						subtitle="EV models with active listings in the past 12 months."
+						countLabel={`${electricTop.length} featured`}
+					/>
 
-						return (
-							<a
-								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
-								href={href}
-								className="group flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile theme-surface"
-							>
-								<div className="flex min-w-0 items-center gap-3">
-									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
+					<div className="mt-10 grid gap-4 md:grid-cols-3">
+						{electricTop.map((model) => (
+							<ModelTile
+								key={`${model.brand_slug}-${model.model_name_slug ?? model.model_name ?? "model"}`}
+								model={model}
+								tagLabel="EV"
+							/>
+						))}
+					</div>
+
+					{electricTop.length === 0 ? (
+						<p className="mt-8 text-sm text-[color:var(--txt-3)]">
+							No active EV listings found. Check your D1 data or update schedule.
+						</p>
+					) : null}
+				</section>
+
+				{/* TRADITIONAL */}
+				<section className="mt-14 border-t border-[color:var(--surface-border)] pt-10">
+					<SectionHeader
+						pill="Powertrain"
+						title="Traditional powertrain models"
+						subtitle="Petrol, diesel, and non-EV models with recent listings."
+						countLabel={`${traditionalTop.length} featured`}
+					/>
+
+					<div className="mt-10 grid gap-4 md:grid-cols-3">
+						{traditionalTop.map((model) => (
+							<ModelTile
+								key={`${model.brand_slug}-${model.model_name_slug ?? model.model_name ?? "model"}`}
+								model={model}
+								tagLabel="ICE"
+							/>
+						))}
+					</div>
+
+					{traditionalTop.length === 0 ? (
+						<p className="mt-8 text-sm text-[color:var(--txt-3)]">
+							No active traditional listings found. Check your D1 data or update schedule.
+						</p>
+					) : null}
+				</section>
+
+				{/* CLASSIC */}
+				<section className="mt-14 border-t border-[color:var(--surface-border)] pt-10">
+					<SectionHeader
+						pill="Heritage"
+						title="Classic cars"
+						subtitle="Listings older than 30 years with prices above 300,000."
+						countLabel={`${classicTop.length} featured`}
+					/>
+
+					<div className="mt-10 grid gap-4 md:grid-cols-3">
+						{classicTop.map((model) => (
+							<ModelTile
+								key={`${model.brand_slug}-${model.model_name_slug ?? model.model_name ?? "model"}`}
+								model={model}
+								tagLabel="Classic"
+							/>
+						))}
+					</div>
+
+					{classicTop.length === 0 ? (
+						<p className="mt-8 text-sm text-[color:var(--txt-3)]">
+							No classic listings found. Check your D1 data or update schedule.
+						</p>
+					) : null}
+				</section>
+
+				{/* BRANDS */}
+				<section className="mt-16 border-t border-[color:var(--surface-border)] pt-10">
+					<SectionHeader
+						pill="Brands"
+						title="Discover cars, trims, and real market details"
+						subtitle="Start with a brand to see models, specs, and listing insights curated for the Hong Kong market."
+						countLabel={`${brands.length} brands`}
+					/>
+
+					<div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						{brands.map((brand) => {
+							const title = getBrandTitle(brand);
+							const locale = brand.name_zh_tw || brand.name_zh_hk;
+
+							return (
+								<Link
+									key={brand.slug}
+									href={`/hk/zh/${brand.slug}`}
+									className={[
+										"group flex items-center gap-4",
+										"rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
+										"p-5 transition",
+										"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
+										"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+										"shadow-[var(--shadow-elev-1)]",
+									].join(" ")}
+								>
+									<div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
 										<BrandLogo
-											slug={model.brand_slug}
-											alt={`${brandLabel} logo`}
-											size={32}
-											className="h-8 w-8 object-contain"
+											slug={brand.slug}
+											alt={`${title} logo`}
+											size={40}
+											className="h-10 w-10 object-contain"
 										/>
 									</div>
+
 									<div className="min-w-0">
-										<div className="text-xs uppercase tracking-[0.2em] text-slate-400">
-											{brandLabel}
+										<div className="truncate text-base font-semibold tracking-tight text-[color:var(--txt-1)]">
+											{title}
 										</div>
-										<div className="text-lg font-semibold text-slate-900">{modelLabel}</div>
-										<div className="text-xs text-slate-500">
-											{model.brand_slug} · {yearText}
+
+										<div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[color:var(--txt-3)]">
+											{brand.slug}
 										</div>
+
+										{locale ? <div className="mt-1 text-xs text-[color:var(--txt-2)]">{locale}</div> : null}
 									</div>
-								</div>
-								<div
-									className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold shadow count-badge"
-									style={{
-										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
-										color: "var(--background)",
-										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
-									}}
-								>
-									{model.listing_count}
-								</div>
-							</a>
-						);
-					})}
+								</Link>
+							);
+						})}
 					</div>
-				</section>
 
-				{electricTop.length === 0 ? (
-					<p className="mt-6 text-sm text-slate-500">
-						No active listings found. Check your D1 data or update schedule.
-					</p>
-				) : null}
-
-				<section className="mt-16 space-y-4">
-					<div className="space-y-1">
-						<h2 className="text-xl font-semibold text-slate-900">Traditional powertrain models</h2>
-						<p className="text-sm text-slate-600">
-							Petrol, diesel, and non-EV models with recent listings.
+					{brands.length === 0 ? (
+						<p className="mt-10 text-sm text-[color:var(--txt-3)]">
+							No brands found. Check your D1 binding or seed data.
 						</p>
-					</div>
-					<div className="grid gap-4 md:grid-cols-3 traditional-car-list">
-					{traditionalTop.map((model) => {
-						const modelLabel = model.model_name || "Unknown model";
-						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
-						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
-						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
-						const yearText =
-							model.min_year && model.max_year
-								? model.min_year === model.max_year
-									? `${model.min_year}`
-									: `${model.min_year}–${model.max_year}`
-								: "Years N/A";
-
-						return (
-							<a
-								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
-								href={href}
-								className="group flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile theme-surface"
-							>
-								<div className="flex min-w-0 items-center gap-3">
-									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
-										<BrandLogo
-											slug={model.brand_slug}
-											alt={`${brandLabel} logo`}
-											size={32}
-											className="h-8 w-8 object-contain"
-										/>
-									</div>
-									<div className="min-w-0">
-										<div className="text-xs uppercase tracking-[0.2em] text-slate-400">
-											{brandLabel}
-										</div>
-										<div className="text-lg font-semibold text-slate-900">{modelLabel}</div>
-										<div className="text-xs text-slate-500">
-											{model.brand_slug} · {yearText}
-										</div>
-									</div>
-								</div>
-								<div
-									className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold shadow count-badge"
-									style={{
-										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
-										color: "var(--background)",
-										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
-									}}
-								>
-									{model.listing_count}
-								</div>
-							</a>
-						);
-					})}
-					</div>
+					) : null}
 				</section>
-
-				{traditionalTop.length === 0 ? (
-					<p className="mt-6 text-sm text-slate-500">
-						No active traditional listings found. Check your D1 data or update schedule.
-					</p>
-				) : null}
-
-				<section className="mt-16 space-y-4">
-					<div className="space-y-1">
-						<h2 className="text-xl font-semibold text-slate-900">Classic cars</h2>
-						<p className="text-sm text-slate-600">
-							Listings older than 30 years with prices above 300,000.
-						</p>
-					</div>
-					<div className="grid gap-4 md:grid-cols-3 classic-car-list">
-					{classicTop.map((model) => {
-						const modelLabel = model.model_name || "Unknown model";
-						const brandLabel = model.name_zh_hk || model.name_en || model.brand_slug;
-						const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
-						const href = `/hk/zh/${model.brand_slug}/${modelNameSlug}`;
-						const yearText =
-							model.min_year && model.max_year
-								? model.min_year === model.max_year
-									? `${model.min_year}`
-									: `${model.min_year}–${model.max_year}`
-								: "Years N/A";
-
-						return (
-							<a
-								key={`${model.brand_slug}-${model.model_slug}-${model.model_name_slug}`}
-								href={href}
-								className="group flex items-center justify-between gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] model-tile theme-surface"
-							>
-								<div className="flex min-w-0 items-center gap-3">
-									<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900/5">
-										<BrandLogo
-											slug={model.brand_slug}
-											alt={`${brandLabel} logo`}
-											size={32}
-											className="h-8 w-8 object-contain"
-										/>
-									</div>
-									<div className="min-w-0">
-										<div className="text-xs uppercase tracking-[0.2em] text-slate-400">
-											{brandLabel}
-										</div>
-										<div className="text-lg font-semibold text-slate-900">{modelLabel}</div>
-										<div className="text-xs text-slate-500">
-											{model.brand_slug} · {yearText}
-										</div>
-									</div>
-								</div>
-								<div
-									className="flex h-12 w-12 items-center justify-center rounded-full text-xs font-semibold shadow count-badge"
-									style={{
-										backgroundColor: "color-mix(in srgb, var(--foreground) 90%, transparent)",
-										color: "var(--background)",
-										border: "1px solid color-mix(in srgb, var(--foreground) 30%, transparent)",
-									}}
-								>
-									{model.listing_count}
-								</div>
-							</a>
-						);
-					})}
-					</div>
-				</section>
-
-				{classicTop.length === 0 ? (
-					<p className="mt-6 text-sm text-slate-500">
-						No classic listings found. Check your D1 data or update schedule.
-					</p>
-				) : null}
-
-				<section className="mt-16 flex flex-col gap-6">
-					<div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-900/10 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-700">
-						Brands
-					</div>
-					<div className="space-y-3">
-						<h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
-							Discover cars, trims, and real market details
-						</h2>
-						<p className="max-w-2xl text-sm text-slate-600 sm:text-base">
-							Start with a brand to see models, specs, and listing insights curated for the
-							Hong Kong market.
-						</p>
-					</div>
-					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate-500">
-						<span className="h-[1px] w-10 bg-slate-300" aria-hidden />
-						{brands.length} brands
-					</div>
-				</section>
-
-				<section className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-					{brands.map((brand) => {
-						const title = getBrandTitle(brand);
-						const locale = brand.name_zh_tw || brand.name_zh_hk;
-						return (
-							<a
-								key={brand.slug}
-								href={`/hk/zh/${brand.slug}`}
-								className="group flex items-center gap-4 rounded-2xl border p-4 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)] backdrop-blur transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-24px_rgba(15,23,42,0.7)] brand-tile theme-surface"
-							>
-								<div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-900/5">
-									<BrandLogo
-										slug={brand.slug}
-										alt={`${title} logo`}
-										size={40}
-										className="h-10 w-10 object-contain"
-									/>
-								</div>
-								<div className="min-w-0">
-									<div className="text-base font-semibold text-slate-900">{title}</div>
-									<div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-										{brand.slug}
-									</div>
-									{locale ? <div className="text-xs text-slate-500">{locale}</div> : null}
-								</div>
-							</a>
-						);
-					})}
-				</section>
-
-				{brands.length === 0 ? (
-					<p className="mt-10 text-sm text-slate-500">
-						No brands found. Check your D1 binding or seed data.
-					</p>
-				) : null}
-			</main>
-		</div>
+			</div>
+		</main>
 	);
 }
+

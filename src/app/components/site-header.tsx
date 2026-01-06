@@ -45,7 +45,7 @@ export default async function SiteHeader() {
 					backgroundColor: "color-mix(in srgb, var(--bg-1) 86%, transparent)",
 				}}
 			>
-				<div className="mx-auto max-w-6xl px-6 py-4 sm:px-10 lg:px-16">
+				<div className="mx-auto max-w-5xl px-6 py-4 sm:px-10 lg:px-16">
 					<div className="flex items-center justify-between gap-4">
 						<Link
 							href="/"

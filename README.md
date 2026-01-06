@@ -45,3 +45,16 @@ To learn more about Next.js, take a look at the following resources:
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Tailwind class to adjust page width
+Yes. In Tailwind, max-w-6xl is wider than max-w-5xl.
+
+Typical Tailwind defaults (unless you changed the config):
+
+max-w-5xl ≈ 64rem (about 1024px)
+
+max-w-6xl ≈ 72rem (about 1152px)
+
+So switching from max-w-5xl → max-w-6xl increases the container width by 8rem (~128px), which will be noticeable, especially on desktop.
+
+If you want “Apple-like” premium spacing, max-w-5xl usually reads better. If you want to show more cards per row with less scrolling, max-w-6xl is more practical.
