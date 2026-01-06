@@ -68,7 +68,7 @@ export default function ModelGroupHeader({
 											"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 										].join(" ")}
 									>
-										Overview
+										
 										<span aria-hidden className="text-[color:var(--txt-3)]">
 											ⓘ
 										</span>

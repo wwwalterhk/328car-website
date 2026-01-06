@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import type { NextAuthOptions, Account, Profile, User } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import AppleProvider from "next-auth/providers/apple";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database };
@@ -11,8 +12,8 @@ async function getDb(): Promise<D1Database | null> {
 	return db ?? null;
 }
 
-async function persistGoogleUser(user: User, account: Account | null, profile?: Profile) {
-	if (account?.provider !== "google") return;
+async function persistOauthUser(user: User, account: Account | null, profile?: Profile) {
+	if (!account || (account.provider !== "google" && account.provider !== "apple")) return;
 
 	const db = await getDb();
 	if (!db) return;
@@ -83,19 +84,51 @@ function getProfileLocale(profile?: Profile): string | null {
 }
 
 export const authOptions: NextAuthOptions = {
+	debug: true,
 	providers: [
 		GoogleProvider({
 			clientId: process.env.GOOGLE_CLIENT_ID || "",
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
 		}),
+		AppleProvider({
+			clientId: process.env.APPLE_CLIENT_ID || "com.328car.328carhk2",
+			clientSecret: process.env.APPLE_CLIENT_SECRET || "",
+			authorization: { params: { scope: "name email" } },
+		}),
 	],
+	cookies: {
+		pkceCodeVerifier: {
+			name: "next-auth.pkce.code_verifier",
+			options: {
+				httpOnly: true,
+				sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+				path: "/",
+				secure: process.env.NODE_ENV === "production",
+			},
+		},
+		csrfToken: {
+			name: "next-auth.csrf-token",
+			options: {
+				httpOnly: false,
+				sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+				path: "/",
+				secure: process.env.NODE_ENV === "production",
+			},
+		},
+	},
 	session: {
 		strategy: "jwt",
 	},
 	callbacks: {
 		async signIn({ user, account, profile }) {
-			await persistGoogleUser(user, account, profile);
+			await persistOauthUser(user, account, profile);
 			return true;
+		},
+	},
+	events: {
+		async signIn(message) {
+			// Temporary: log sign-in events for debugging
+			console.log("NextAuth signIn event:", message);
 		},
 	},
 	secret: process.env.NEXTAUTH_SECRET,

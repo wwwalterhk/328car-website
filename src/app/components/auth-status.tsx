@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { signOut, useSession } from "next-auth/react";
 import GoogleSignInButton from "./google-signin-button";
+import AppleSignInButton from "./apple-signin-button";
 
 export default function AuthStatus() {
 	const { data, status } = useSession();
@@ -17,7 +18,12 @@ export default function AuthStatus() {
 	}
 
 	if (status !== "authenticated") {
-		return <GoogleSignInButton />;
+		return (
+			<div className="flex flex-wrap items-center gap-2">
+				<GoogleSignInButton />
+				<AppleSignInButton />
+			</div>
+		);
 	}
 
 	const name = data.user?.name || data.user?.email || "Signed in";
