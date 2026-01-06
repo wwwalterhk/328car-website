@@ -4,9 +4,15 @@ import Image from "next/image";
 import { signOut, useSession } from "next-auth/react";
 import GoogleSignInButton from "./google-signin-button";
 import AppleSignInButton from "./apple-signin-button";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 export default function AuthStatus() {
 	const { data, status } = useSession();
+	const searchParams = useSearchParams();
+	const activation = searchParams.get("activation");
+	const error = searchParams.get("error");
+	const showActivationNotice = activation === "1" || error === "Activation required. Check your email for the activation link.";
 
 	if (status === "loading") {
 		return (
@@ -19,9 +25,22 @@ export default function AuthStatus() {
 
 	if (status !== "authenticated") {
 		return (
-			<div className="flex flex-wrap items-center gap-2">
-				<GoogleSignInButton />
-				<AppleSignInButton />
+			<div className="flex flex-col gap-3">
+				{showActivationNotice ? (
+					<div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+						Check your email for the activation link to finish sign-up.
+					</div>
+				) : null}
+				<div className="flex flex-wrap items-center gap-2">
+					<GoogleSignInButton />
+					<AppleSignInButton />
+					<Link
+						href="/auth/signin"
+						className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+					>
+						Email sign-in
+					</Link>
+				</div>
 			</div>
 		);
 	}

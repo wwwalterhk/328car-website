@@ -2,7 +2,10 @@ import NextAuth from "next-auth";
 import type { NextAuthOptions, Account, Profile, User } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import AppleProvider from "next-auth/providers/apple";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { sendActivationEmail } from "./email";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database };
 
@@ -98,6 +101,110 @@ function getProfileName(profile?: Profile): string | null {
 export const authOptions: NextAuthOptions = {
 	debug: true,
 	providers: [
+		CredentialsProvider({
+			name: "Email & Password",
+			credentials: {
+				email: { label: "Email", type: "email" },
+				password: { label: "Password", type: "password" },
+				mode: { label: "Mode", type: "text" },
+				captcha: { label: "Captcha", type: "text" },
+			},
+			async authorize(credentials) {
+				const db = await getDb();
+				if (!db) throw new Error("DB unavailable");
+				const email = readString(credentials?.email)?.toLowerCase();
+				const password = readString(credentials?.password);
+				const intent = readString((credentials as Record<string, unknown> | undefined)?.mode) === "register" ? "register" : "signin";
+				const captcha = readString((credentials as Record<string, unknown> | undefined)?.captcha);
+				if (!email || !password) return null;
+
+				await ensurePasswordTable(db);
+				await ensureVerificationTable(db);
+
+				const userRow = await db
+					.prepare("SELECT user_pk, email, name, avatar_url, status FROM users WHERE email = ? LIMIT 1")
+					.bind(email)
+					.first<{ user_pk: number; email: string; name: string | null; avatar_url: string | null; status: string }>();
+
+				if (!userRow) {
+					if (intent === "register") {
+						const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
+						if (!captcha || captcha.toLowerCase() !== expected) {
+							throw new Error("captcha failed");
+						}
+					}
+					const { hash, salt } = hashPassword(password);
+					try {
+						await db
+							.prepare("INSERT INTO users (email, name, avatar_url, status) VALUES (?, ?, ?, ?)")
+							.bind(email, null, null, "pending")
+							.run();
+					} catch (error) {
+						console.error("User insert failed:", error);
+						// Unique constraint hit while registering
+						throw new Error("already registered");
+					}
+					const newUser = await db
+						.prepare("SELECT user_pk, email FROM users WHERE email = ? LIMIT 1")
+						.bind(email)
+						.first<{ user_pk: number; email: string }>();
+					if (!newUser?.user_pk) return null;
+					await db
+						.prepare(
+							`INSERT INTO user_passwords (user_pk, password_hash, salt, created_at, updated_at)
+               VALUES (?, ?, ?, datetime('now'), datetime('now'))
+               ON CONFLICT(user_pk) DO UPDATE SET password_hash = excluded.password_hash, salt = excluded.salt, updated_at = excluded.updated_at`
+						)
+						.bind(newUser.user_pk, hash, salt)
+						.run();
+
+					const tokenResult = await getOrCreateVerificationToken(db, newUser.user_pk);
+					if (tokenResult.created) {
+						try {
+							await sendActivationEmail({ to: email, token: tokenResult.token });
+						} catch (error) {
+							console.error("Activation email send failed:", error);
+						}
+					}
+					throw new Error("Activation required. Check your email for the activation link.");
+				}
+
+				if (intent === "register") {
+					const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
+					if (!captcha || captcha.toLowerCase() !== expected) {
+						throw new Error("captcha failed");
+					}
+					throw new Error("already registered");
+				}
+
+				const pwdRow = await db
+					.prepare("SELECT password_hash, salt FROM user_passwords WHERE user_pk = ? LIMIT 1")
+					.bind(userRow.user_pk)
+					.first<{ password_hash: string; salt: string }>();
+
+			if (!pwdRow) return null;
+			if (!verifyPassword(password, pwdRow.salt, pwdRow.password_hash)) return null;
+
+				if (userRow.status !== "active") {
+					const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);
+					if (tokenResult.created) {
+						try {
+							await sendActivationEmail({ to: email, token: tokenResult.token });
+						} catch (err) {
+							console.error("Activation email send failed:", err);
+						}
+					}
+					throw new Error("Activation required. Check your email for the activation link.");
+				}
+
+			return {
+				id: String(userRow.user_pk),
+				email: userRow.email,
+				name: userRow.name ?? undefined,
+					image: userRow.avatar_url ?? undefined,
+				};
+			},
+		}),
 		GoogleProvider({
 			clientId: process.env.GOOGLE_CLIENT_ID || "",
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -137,6 +244,10 @@ export const authOptions: NextAuthOptions = {
 			return true;
 		},
 	},
+	pages: {
+		signIn: "/auth/signin",
+		error: "/auth/error",
+	},
 	events: {
 		async signIn(message) {
 			// Temporary: log sign-in events for debugging
@@ -147,3 +258,80 @@ export const authOptions: NextAuthOptions = {
 };
 
 export const authHandler = NextAuth(authOptions);
+
+function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+	const usedSalt = salt || randomBytes(16).toString("hex");
+	const hash = scryptSync(password, usedSalt, 64).toString("hex");
+	return { hash, salt: usedSalt };
+}
+
+function verifyPassword(password: string, salt: string, hash: string): boolean {
+	try {
+		const hashed = hashPassword(password, salt).hash;
+		return timingSafeEqual(Buffer.from(hashed, "hex"), Buffer.from(hash, "hex"));
+	} catch {
+		return false;
+	}
+}
+
+async function ensurePasswordTable(db: D1Database) {
+	await db
+		.prepare(
+			`CREATE TABLE IF NOT EXISTS user_passwords (
+        user_pk INTEGER PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_pk) REFERENCES users(user_pk)
+      )`
+		)
+		.run();
+}
+
+async function ensureVerificationTable(db: D1Database) {
+	await db
+		.prepare(
+			`CREATE TABLE IF NOT EXISTS user_verification_tokens (
+        token TEXT PRIMARY KEY,
+        user_pk INTEGER NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_pk) REFERENCES users(user_pk)
+      )`
+		)
+		.run();
+}
+
+async function getOrCreateVerificationToken(
+	db: D1Database,
+	userPk: number
+): Promise<{ token: string; created: boolean }> {
+	await ensureVerificationTable(db);
+	const existing = await db
+		.prepare(
+			`SELECT token FROM user_verification_tokens
+       WHERE user_pk = ? AND expires_at > datetime('now')
+       ORDER BY created_at DESC
+       LIMIT 1`
+		)
+		.bind(userPk)
+		.first<{ token: string }>();
+
+	if (existing?.token) {
+		return { token: existing.token, created: false };
+	}
+
+	const token = randomBytes(32).toString("hex");
+	const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
+
+	await db
+		.prepare(
+			`INSERT INTO user_verification_tokens (token, user_pk, expires_at, created_at)
+       VALUES (?, ?, ?, datetime('now'))`
+		)
+		.bind(token, userPk, expiresAt.toISOString())
+		.run();
+
+	return { token, created: true };
+}

@@ -18,7 +18,8 @@
 		"next": "15.5.9",
 		"next-auth": "^4.24.11",
 		"react": "19.1.4",
-		"react-dom": "19.1.4"
+		"react-dom": "19.1.4",
+		"resend": "^6.6.0"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3",

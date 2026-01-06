@@ -52,7 +52,8 @@
 		"NEXTJS_ENV": "production",
 		"NEXTAUTH_URL": "https://328car.com",
 		"OPENAI_BASE_URL": "https://api.openai.com/v1",
-		"OPENAI_BATCH_MODEL": "gpt-5.2"
+		"OPENAI_BATCH_MODEL": "gpt-5.2",
+		"RESEND_FROM_EMAIL": "admin@328car.com"
 	},
 	"routes": [
 		{

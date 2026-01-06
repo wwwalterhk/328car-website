@@ -347,6 +347,42 @@ CREATE TABLE IF NOT EXISTS user_accounts (
   FOREIGN KEY (user_pk) REFERENCES users(user_pk)
 );
 
+-- Password auth (hashed)
+CREATE TABLE IF NOT EXISTS user_passwords (
+  user_pk INTEGER PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk)
+);
+
+-- Email activation tokens
+CREATE TABLE IF NOT EXISTS user_verification_tokens (
+  token TEXT PRIMARY KEY,
+  user_pk INTEGER NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk)
+);
+
+-- General email logs
+CREATE TABLE IF NOT EXISTS email_logs (
+  email_log_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  to_email TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  token TEXT PRIMARY KEY,
+  user_pk INTEGER NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_pk) REFERENCES users(user_pk)
+);
+
 -- Sessions (if you want DB-backed sessions)
 CREATE TABLE IF NOT EXISTS user_sessions (
   session_pk INTEGER PRIMARY KEY AUTOINCREMENT,

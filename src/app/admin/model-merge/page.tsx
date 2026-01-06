@@ -309,6 +309,31 @@ export default function ModelMergeAdminPage() {
 						>
 							Process 50
 						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Send test email");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								try {
+									const res = await fetch("/api/admin/send-test-email", {
+										method: "POST",
+										cache: "no-store",
+									});
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Test email sent" : "Test email failed");
+								} catch (error) {
+									setMessage(`Test email error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-full border border-[color:var(--accent-1)] bg-white px-3 py-1 text-[12px] font-semibold text-[color:var(--accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-1)]/20 hover:shadow-sm"
+						>
+							Send test email
+						</button>
 						{unprocessedCount != null || processingCount != null || failedCount != null ? (
 							<span className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[color:var(--accent-3)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-1)] ring-1 ring-[color:var(--accent-1)]/30">
 								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-1)]" aria-hidden />
