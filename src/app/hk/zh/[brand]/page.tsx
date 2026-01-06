@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import BrandLogo from "@/app/components/brand-logo";
 import ModelGroupHeader from "@/app/components/model-group-header";
-import BrandSwitcher from "@/app/components/brand-switcher";
+// BrandSwitcher intentionally not used on this page
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,7 @@ type ModelRow = {
 	group_heading: string | null;
 	group_subheading: string | null;
 	group_summary: string | null;
+	group_slug: string | null;
 	power: string | null;
 	start_price: number | null;
 };
@@ -130,7 +131,8 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         g.group_name,
         g.heading AS group_heading,
         g.subheading AS group_subheading,
-        g.summary AS group_summary
+        g.summary AS group_summary,
+        g.group_slug
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -259,6 +261,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 			heading: string | null;
 			subheading: string | null;
 			summary: string | null;
+			slug: string | null;
 			items: ModelRow[];
 		}
 	>();
@@ -272,6 +275,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 					heading: model.group_heading,
 					subheading: model.group_subheading,
 					summary: model.group_summary,
+					slug: model.group_slug,
 					items: [],
 				});
 			}
@@ -388,7 +392,9 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 									name={group.name}
 									heading={group.heading}
 									subheading={group.subheading}
-									summary={group.summary}
+									summary={group.items[0]?.group_summary}
+									collectionHref={`/hk/zh/${brand}/collections/${group.slug ?? ""}`}
+									collectionLabel="View collection"
 									/>
 									<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 										{group.items.map((m) => (

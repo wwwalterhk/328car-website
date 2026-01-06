@@ -171,7 +171,7 @@ function buildRequest(row: Row, model: string) {
 
 Tone: premium, modern, controlled, visual; avoid slogans and exaggeration.
 
-Output: {"heading":"heading in 3-12 chars, no model name", subheading:"exactly 2-3 sentences (no title, no bullets), 70–110 Chinese characters total", "keywords":"comma-separated english simple model name keywords, no spaces, max 3 keywords model speific, not general, for searching and assign the model for system, e.g. 320i, 458, clubman, Freed, Civic etc.", "summary":"a long buyer introduction summary for the model series. may be some paragraphs."}`;
+Output: {"heading":"heading in 3-12 chars, no model name", subheading:"exactly 2-3 sentences (no title, no bullets), 70–110 Chinese characters total", "keywords":"comma-separated english simple model name keywords, no spaces, max 3 keywords model speific, not general, for searching and assign the model for system, e.g. 320i, 458, clubman, Freed, Civic etc.", "summary":"a long buyer introduction overview for the model series. may be some paragraphs (can add line break)."}`;
 
 	return {
 		custom_id: `model_group_content::${row.brand_slug}::${row.group_slug}`,
