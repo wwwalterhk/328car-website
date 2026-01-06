@@ -152,7 +152,7 @@ function YearCard({
 			className={[
 			"group flex flex-col justify-between",
 			"rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5",
-			"transition hover:bg-[color:var(--cell-2)] hover:shadow-[var(--shadow-elev-1)]",
+			"transition hover:bg-[color:var(--cell-2)]",
 			"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 			].join(" ")}
 
@@ -219,6 +219,7 @@ export default async function VariantYearsPage({ params }: PageProps) {
 	}
 
 	const brandTitle = meta.name_zh_hk || meta.name_en || titleFromSlug(brandSlug);
+	const brandTitleEn = meta.name_en || titleFromSlug(brandSlug);
 	const modelTitle = meta.model_name || titleFromSlug(modelNameSlug);
 	const variantTitle = titleFromSlug(variantSlug);
 
@@ -259,7 +260,7 @@ export default async function VariantYearsPage({ params }: PageProps) {
 				{/* header */}
 				<header className="mt-8 space-y-6">
 					<div className="space-y-2">
-						<div className="text-xs tracking-[0.24em] uppercase text-[color:var(--txt-3)]">{variantTitle}</div>
+						<div className="text-xs tracking-[0.24em] uppercase text-[color:var(--txt-3)]">{brandTitleEn}</div>
 						<h1 className="text-3xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
 							{modelTitle}
 						</h1>

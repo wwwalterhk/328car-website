@@ -198,11 +198,13 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 	}
 
 	const brandTitle = cars[0]?.name_zh_hk || cars[0]?.name_en || brand;
+	const brandTitleEn = cars[0]?.name_en || titleFromSlug(brand);
 	const heading = cars[0]?.model_name || titleFromSlug(variant || model || "Model");
 	const subtitle = "Active listings for this variant and year (last 12 months).";
 
 	const brandHref = `/hk/zh/${brand}`;
 	const modelHref = `/hk/zh/${brand}/${model}`;
+	const variantHref = `/hk/zh/${brand}/${model}/${variant}`;
 
 	return (
 		<main className="relative min-h-screen text-[color:var(--txt-1)]">
@@ -233,13 +235,19 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 					<span aria-hidden className="text-[color:var(--txt-3)]">
 						›
 					</span>
+					<Link href={variantHref} className="transition hover:text-[color:var(--txt-1)]">
+						{titleFromSlug(variant)}
+					</Link>
+					<span aria-hidden className="text-[color:var(--txt-3)]">
+						›
+					</span>
 					<span className="text-[color:var(--txt-2)]">{yearNumber || "Year"}</span>
 				</div>
 
 				{/* Header */}
 				<header className="mt-8 space-y-5">
 					<div className="space-y-2">
-						<div className="text-xs tracking-[0.28em] uppercase text-[color:var(--txt-3)]">{brand}</div>
+						<div className="text-xs tracking-[0.28em] uppercase text-[color:var(--txt-3)]">{brandTitleEn}</div>
 						<h1 className="text-3xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
 							{heading}{" "}
 							<span className="text-[color:var(--txt-3)]" aria-hidden>

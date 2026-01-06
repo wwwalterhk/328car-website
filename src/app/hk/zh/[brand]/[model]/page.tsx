@@ -20,21 +20,8 @@ type VariantRow = {
 	facelift: string | null;
 	min_year: number | null;
 	max_year: number | null;
+	min_price: number | null;
 };
-
-type YearAggRow = {
-  model_slug: string | null;
-  year: number | null;
-  listing_count: number;
-  min_price: number | null;
-};
-
-type YearRow = {
-  year: number | null;
-  listing_count: number;
-  min_price: number | null;
-};
-
 
 async function loadVariants(brandSlug: string, modelNameSlug: string): Promise<VariantRow[]> {
 	const { env } = await getCloudflareContext({ async: true });
@@ -59,7 +46,8 @@ async function loadVariants(brandSlug: string, modelNameSlug: string): Promise<V
         m.turbo,
         m.facelift,
         MIN(c.year) AS min_year,
-        MAX(c.year) AS max_year
+        MAX(c.year) AS max_year,
+        MIN(COALESCE(c.discount_price, c.price)) AS min_price
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -78,56 +66,6 @@ async function loadVariants(brandSlug: string, modelNameSlug: string): Promise<V
 	return result.results ?? [];
 }
 
-async function loadYearsByVariant(brandSlug: string, modelNameSlug: string): Promise<Map<string, YearRow[]>> {
-	const { env } = await getCloudflareContext({ async: true });
-	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
-	if (!db) return new Map();
-
-	const result = await db
-		.prepare(
-			`SELECT
-        m.model_slug AS model_slug,
-        c.year AS year,
-        COUNT(1) AS listing_count,
-  		MIN(COALESCE(c.discount_price, c.price)) AS min_price
-      FROM car_listings c
-      INNER JOIN models m ON c.model_pk = m.model_pk
-      INNER JOIN brands b ON m.brand_slug = b.slug
-      WHERE
-        c.sts = 1
-        AND c.model_sts = 1
-        AND c.last_update_datetime > datetime('now', '-1 year')
-        AND b.slug = ?
-        AND m.model_name_slug = ?
-      GROUP BY m.model_slug, c.year
-      ORDER BY c.year DESC`
-		)
-		.bind(brandSlug, modelNameSlug)
-		.all<YearAggRow>();
-
-	const map = new Map<string, YearRow[]>();
-	for (const row of result.results ?? []) {
-		const k = row.model_slug;
-		if (!k) continue;
-		const arr = map.get(k) ?? [];
-		arr.push({ year: row.year, listing_count: row.listing_count, min_price: row.min_price });
-		map.set(k, arr);
-	}
-
-	// ensure deterministic order (year desc, then count desc)
-	for (const [k, arr] of map.entries()) {
-		arr.sort((a, b) => {
-			const ya = a.year ?? -1;
-			const yb = b.year ?? -1;
-			if (yb !== ya) return yb - ya;
-			return (b.listing_count || 0) - (a.listing_count || 0);
-		});
-		map.set(k, arr);
-	}
-
-	return map;
-}
-
 function formatInt(n: number) {
 	try {
 		return new Intl.NumberFormat("en-HK").format(n);
@@ -136,7 +74,7 @@ function formatInt(n: number) {
 	}
 }
 
-function formatHKD(n: number | null | undefined): string {
+function formatHKD(n: number | null | undefined) {
 	if (n == null || !Number.isFinite(n)) return "—";
 	try {
 		return `HK$${new Intl.NumberFormat("en-HK").format(Math.round(n))}`;
@@ -163,13 +101,7 @@ function titleFromSlug(slug: string) {
 
 function MetaPill({ label, value }: { label: string; value: string }) {
 	return (
-		<div
-			className={[
-				"inline-flex items-center gap-2",
-				"rounded-full border border-[color:var(--surface-border)]",
-				"bg-[color:var(--cell-1)] px-4 py-2",
-			].join(" ")}
-		>
+		<div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-2">
 			<span className="text-sm font-semibold tabular-nums text-[color:var(--txt-1)]">{value}</span>
 			<span className="text-xs tracking-[0.18em] uppercase text-[color:var(--txt-3)]">{label}</span>
 		</div>
@@ -189,17 +121,13 @@ type PageProps = { params: Promise<{ brand: string; model: string }> };
 export default async function ModelVariantsPage({ params }: PageProps) {
 	const { brand: brandSlug, model: modelNameSlug } = await params;
 
-	const [variants, yearsMap] = await Promise.all([
-		loadVariants(brandSlug, modelNameSlug),
-		loadYearsByVariant(brandSlug, modelNameSlug),
-	]);
+	const variants = await loadVariants(brandSlug, modelNameSlug);
 
-	const brandTitle = variants[0]?.name_zh_hk || variants[0]?.name_en || brandSlug;
+	const brandTitle = variants[0]?.name_zh_hk || variants[0]?.name_en || titleFromSlug(brandSlug);
 	const modelTitle = variants[0]?.model_name || titleFromSlug(modelNameSlug || "model");
 	const totalListings = variants.reduce((acc, v) => acc + (v.listing_count || 0), 0);
 
 	const brandHref = `/hk/zh/${brandSlug}`;
-	const modelHref = `/hk/zh/${brandSlug}/${modelNameSlug}`;
 
 	return (
 		<main className="relative min-h-screen text-[color:var(--txt-1)]">
@@ -234,21 +162,16 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 					<div className="space-y-2">
 						<div className="text-xs tracking-[0.28em] uppercase text-[color:var(--txt-3)]">{brandSlug}</div>
 						<h1 className="text-3xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
-							{modelTitle}{" "}
-							<span className="text-[color:var(--txt-3)]" aria-hidden>
-								—
-							</span>{" "}
-							Variants
+							{modelTitle}
 						</h1>
 						<p className="max-w-3xl text-sm leading-relaxed text-[color:var(--txt-2)]">
-							Variants grouped by model slug with active listings in the last 12 months. Select a year to view
-							cars.
+							Choose a variant to view year-by-year listings. (Active listings: last 12 months.)
 						</p>
 					</div>
 
 					<div className="flex flex-wrap gap-3">
 						<MetaPill label="Variants" value={formatInt(variants.length)} />
-						<MetaPill label="Listings" value={formatInt(totalListings)} />
+						<MetaPill label="Listings (12m)" value={formatInt(totalListings)} />
 					</div>
 
 					<div className="border-t border-[color:var(--surface-border)]" />
@@ -290,42 +213,42 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 											: row.power_kw ?? row.engine_cc ?? "—";
 
 								const powerText = [
-									row.power || "—",
+									row.power || null,
 									row.turbo ? row.turbo : null,
 									row.facelift ? `Facelift ${row.facelift}` : null,
 								]
 									.filter(Boolean)
 									.join(" · ");
 
-								const variantSlug = row.model_slug;
-								const years = variantSlug ? yearsMap.get(variantSlug) ?? [] : [];
-								const variantMin = years.reduce<number | null>((acc, y) => {
-								if (y.min_price == null) return acc;
-								if (acc == null) return y.min_price;
-								return Math.min(acc, y.min_price);
-								}, null);
+								const variantSlug = row.model_slug || "";
+								const variantHref = `/hk/zh/${row.brand_slug}/${row.model_name_slug ?? ""}/${variantSlug}`;
 
 								return (
-									<article
+									<Link
 										key={row.model_slug ?? row.model_name_slug ?? yearText}
+										href={variantHref}
 										className={[
+											"group block",
 											"rounded-3xl border border-[color:var(--surface-border)]",
 											"bg-[color:var(--cell-1)] p-5 sm:p-6",
+											"transition hover:bg-[color:var(--cell-2)]",
+											"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 										].join(" ")}
 									>
-										{/* Top row */}
 										<div className="flex items-start justify-between gap-4">
 											<div className="min-w-0">
 												<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
 													{row.model_slug || row.model_name_slug || "Variant"}
 												</div>
+
 												<div className="mt-1 truncate text-lg font-semibold tracking-tight text-[color:var(--txt-1)]">
 													{row.model_name || row.model_name_slug || "Variant"}
 												</div>
+
 												<div className="mt-2 text-xs text-[color:var(--txt-2)]">
 													<span className="text-[color:var(--txt-3)]">{yearText}</span>
 													<span className="mx-2 text-[color:var(--txt-3)]">·</span>
-													<span>{powerText || "—"}</span>
+													<span className="text-[color:var(--txt-2)]">{powerText || "—"}</span>
 												</div>
 											</div>
 
@@ -358,71 +281,22 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 												<SpecValue>{row.manu_model_code || "—"}</SpecValue>
 											</div>
 											<div>
-												<SpecLabel>Variant years</SpecLabel>
-												<SpecValue>{yearText}</SpecValue>
+												<SpecLabel>Price guidance</SpecLabel>
+												<SpecValue>{row.min_price != null ? `From ${formatHKD(row.min_price)}` : "—"}</SpecValue>
 											</div>
 										</div>
 
-
-										{/* Years */}
-										<div className="mt-5">
-											{variantMin != null ? (
-												<div className="mb-4">
-													<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
-														Price guidance
-													</div>
-													<div className="mt-1 flex flex-wrap items-baseline gap-2">
-														<div className="text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
-															From {formatHKD(variantMin)}
-														</div>
-														<div className="text-xs text-[color:var(--txt-3)]">based on active listings (12m)</div>
-													</div>
-												</div>
-											) : null}
-
-											<div className="flex items-center justify-between gap-3">
-												<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">Select year</div>
-												<div className="text-xs text-[color:var(--txt-3)]">Sorted by year (desc)</div>
+										{/* CTA row (quiet) */}
+										<div className="mt-6 flex items-center justify-between gap-4">
+											<div className="text-xs text-[color:var(--txt-3)]">
+												{row.listing_count ? `${formatInt(row.listing_count)} listings` : "Listings"}
 											</div>
 
-											{variantSlug && years.length ? (
-												<div className="mt-3 flex flex-wrap gap-2">
-													{years.map((y, idx) => {
-														const yr = y.year ?? undefined;
-														const href = `/hk/zh/${row.brand_slug}/${row.model_name_slug ?? ""}/${row.model_slug ?? ""}/${yr ?? ""}`;
-
-														return (
-															<Link
-																key={`${row.model_slug ?? row.model_name_slug}-${yr ?? idx}`}
-																href={href}
-																className={[
-																	"inline-flex items-center gap-2",
-																	"rounded-full border border-[color:var(--surface-border)]",
-																	"bg-[color:var(--cell-1)] px-3 py-1.5",
-																	"text-xs font-medium tabular-nums text-[color:var(--txt-1)]",
-																	"transition hover:bg-[color:var(--cell-2)] hover:-translate-y-0.5",
-																	"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
-																].join(" ")}
-															>
-																<span>{yr ?? "—"}</span>
-																<span
-																	className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[color:var(--txt-1)]"
-																	title={`${y.listing_count} listings`}
-																>
-																	{formatInt(y.listing_count)}
-																</span>
-															</Link>
-														);
-													})}
-												</div>
-											) : (
-												<div className="mt-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] p-4">
-													<p className="text-sm text-[color:var(--txt-2)]">No year breakdown available.</p>
-												</div>
-											)}
+											<div className="text-sm font-medium text-[color:var(--txt-1)]">
+												View years <span aria-hidden>→</span>
+											</div>
 										</div>
-
-									</article>
+									</Link>
 								);
 							})}
 						</div>
@@ -436,7 +310,7 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 						className={[
 							"inline-flex items-center gap-2 rounded-full",
 							"border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-5 py-2.5",
-							"text-sm font-medium text-[color:var(--txt-1)] transition hover:bg-[color:var(--cell-2)]",
+							"text-sm font-medium text-[color:var(--txt-1)]",
 							"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 						].join(" ")}
 					>
