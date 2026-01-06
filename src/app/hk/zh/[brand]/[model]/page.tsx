@@ -23,15 +23,18 @@ type VariantRow = {
 };
 
 type YearAggRow = {
-	model_slug: string | null;
-	year: number | null;
-	listing_count: number;
+  model_slug: string | null;
+  year: number | null;
+  listing_count: number;
+  min_price: number | null;
 };
 
 type YearRow = {
-	year: number | null;
-	listing_count: number;
+  year: number | null;
+  listing_count: number;
+  min_price: number | null;
 };
+
 
 async function loadVariants(brandSlug: string, modelNameSlug: string): Promise<VariantRow[]> {
 	const { env } = await getCloudflareContext({ async: true });
@@ -85,7 +88,8 @@ async function loadYearsByVariant(brandSlug: string, modelNameSlug: string): Pro
 			`SELECT
         m.model_slug AS model_slug,
         c.year AS year,
-        COUNT(1) AS listing_count
+        COUNT(1) AS listing_count,
+  		MIN(COALESCE(c.discount_price, c.price)) AS min_price
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -106,7 +110,7 @@ async function loadYearsByVariant(brandSlug: string, modelNameSlug: string): Pro
 		const k = row.model_slug;
 		if (!k) continue;
 		const arr = map.get(k) ?? [];
-		arr.push({ year: row.year, listing_count: row.listing_count });
+		arr.push({ year: row.year, listing_count: row.listing_count, min_price: row.min_price });
 		map.set(k, arr);
 	}
 
@@ -129,6 +133,15 @@ function formatInt(n: number) {
 		return new Intl.NumberFormat("en-HK").format(n);
 	} catch {
 		return String(n);
+	}
+}
+
+function formatHKD(n: number | null | undefined): string {
+	if (n == null || !Number.isFinite(n)) return "—";
+	try {
+		return `HK$${new Intl.NumberFormat("en-HK").format(Math.round(n))}`;
+	} catch {
+		return `HK$${Math.round(n)}`;
 	}
 }
 
@@ -286,6 +299,11 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 
 								const variantSlug = row.model_slug;
 								const years = variantSlug ? yearsMap.get(variantSlug) ?? [] : [];
+								const variantMin = years.reduce<number | null>((acc, y) => {
+								if (y.min_price == null) return acc;
+								if (acc == null) return y.min_price;
+								return Math.min(acc, y.min_price);
+								}, null);
 
 								return (
 									<article
@@ -345,15 +363,26 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 											</div>
 										</div>
 
+
 										{/* Years */}
 										<div className="mt-5">
+											{variantMin != null ? (
+												<div className="mb-4">
+													<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+														Price guidance
+													</div>
+													<div className="mt-1 flex flex-wrap items-baseline gap-2">
+														<div className="text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
+															From {formatHKD(variantMin)}
+														</div>
+														<div className="text-xs text-[color:var(--txt-3)]">based on active listings (12m)</div>
+													</div>
+												</div>
+											) : null}
+
 											<div className="flex items-center justify-between gap-3">
-												<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
-													Select year
-												</div>
-												<div className="text-xs text-[color:var(--txt-3)]">
-													Sorted by year (desc)
-												</div>
+												<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">Select year</div>
+												<div className="text-xs text-[color:var(--txt-3)]">Sorted by year (desc)</div>
 											</div>
 
 											{variantSlug && years.length ? (
@@ -392,6 +421,7 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 												</div>
 											)}
 										</div>
+
 									</article>
 								);
 							})}

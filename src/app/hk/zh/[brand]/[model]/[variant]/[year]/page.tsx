@@ -304,7 +304,6 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 										className={[
 											"rounded-3xl border border-[color:var(--surface-border)]",
 											"bg-[color:var(--cell-1)] p-5 sm:p-6",
-											"shadow-[var(--shadow-elev-1)]",
 										].join(" ")}
 									>
 										{/* top meta */}

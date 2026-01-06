@@ -233,7 +233,6 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 				"p-5 transition",
 				"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
 				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
-				"shadow-[var(--shadow-elev-1)]",
 			].join(" ")}
 		>
 			<div className="flex items-start justify-between gap-4">
@@ -448,7 +447,6 @@ export default async function Home() {
 										"p-5 transition",
 										"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
 										"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
-										"shadow-[var(--shadow-elev-1)]",
 									].join(" ")}
 								>
 									<div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
