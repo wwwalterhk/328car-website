@@ -3,7 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import BrandLogo from "@/app/components/brand-logo";
 import ModelGroupHeader from "@/app/components/model-group-header";
+import BrandSwitcher from "@/app/components/brand-switcher";
+
 export const dynamic = "force-dynamic";
+
 
 type ModelRow = {
 	listing_count: number;
@@ -23,6 +26,40 @@ type ModelRow = {
 	power: string | null;
 	start_price: number | null;
 };
+type BrandNavItem = {
+	brand_slug: string;
+	name_zh_hk: string | null;
+	name_en: string | null;
+	listing_count: number;
+};
+
+async function loadBrandNav(locale: "zh_hk" | "en" = "zh_hk"): Promise<BrandNavItem[]> {
+	const { env } = await getCloudflareContext({ async: true });
+	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
+	if (!db) return [];
+
+	// Counts by brand for “active listings in last 12 months”
+	const result = await db
+		.prepare(
+			`SELECT
+        b.slug AS brand_slug,
+        b.name_zh_hk,
+        b.name_en,
+        COUNT(1) AS listing_count
+      FROM car_listings c
+      INNER JOIN models m ON c.model_pk = m.model_pk
+      INNER JOIN brands b ON m.brand_slug = b.slug
+      WHERE
+        c.sts = 1
+        AND c.model_sts = 1
+        AND c.last_update_datetime > datetime('now', '-1 year')
+      GROUP BY b.slug
+      ORDER BY listing_count DESC`
+		)
+		.all<BrandNavItem>();
+
+	return result.results ?? [];
+}
 
 function formatInt(n: number) {
 	try {
@@ -226,11 +263,12 @@ function ModelCard({ model }: { model: ModelRow }) {
 export default async function BrandModelsPage({ params }: { params: Promise<{ brand: string }> }) {
 	const { brand } = await params;
 
-	const [models, intro, story, hero] = await Promise.all([
+	const [models, intro, story, hero, brandNav] = await Promise.all([
 		loadBrandModels(brand),
 		loadBrandIntro(brand, "zh_hk"),
 		loadBrandStory(brand, "zh_hk"),
 		loadBrandHero(brand),
+		loadBrandNav("zh_hk"),
 	]);
 
 	if (!models.length) notFound();
@@ -288,7 +326,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 
 			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
 				{/* breadcrumb */}
-				<div className="flex items-center justify-center">
+				<div className="flex items-center justify-between gap-4">
 					<nav className="text-xs tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
 						<Link href="/" className="hover:text-[color:var(--txt-1)] transition-colors">
 							Home
@@ -296,6 +334,12 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 						<span className="mx-2 text-[color:var(--txt-3)]">›</span>
 						<span className="text-[color:var(--txt-2)]">{brandTitle}</span>
 					</nav>
+
+					<BrandSwitcher
+						currentBrandSlug={brand}
+						localePathPrefix="/hk/zh"
+						brands={brandNav}
+					/>
 				</div>
 
 				{/* header */}
