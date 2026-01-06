@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 
-type BrandNavItem = {
+export type BrandNavItem = {
 	brand_slug: string;
 	name_zh_hk: string | null;
 	name_en: string | null;
@@ -11,7 +12,6 @@ type BrandNavItem = {
 };
 
 type Props = {
-	currentBrandSlug: string;
 	localePathPrefix?: string; // e.g. "/hk/zh"
 	brands: BrandNavItem[];
 };
@@ -24,11 +24,19 @@ function formatInt(n: number) {
 	}
 }
 
-export default function BrandSwitcher({
-	currentBrandSlug,
-	localePathPrefix = "/hk/zh",
-	brands,
-}: Props) {
+function extractBrandFromPath(pathname: string, prefix: string) {
+	// Example:
+	// prefix: /hk/zh
+	// pathname: /hk/zh/bmw or /hk/zh/bmw/3-series
+	// => brand = "bmw"
+	if (!pathname.startsWith(prefix)) return null;
+	const rest = pathname.slice(prefix.length).replace(/^\/+/, "");
+	const seg = rest.split("/")[0]?.trim();
+	return seg ? seg : null;
+}
+
+export default function BrandSwitcher({ localePathPrefix = "/hk/zh", brands }: Props) {
+	const pathname = usePathname() || "/";
 	const [open, setOpen] = useState(false);
 	const [q, setQ] = useState("");
 
@@ -41,9 +49,17 @@ export default function BrandSwitcher({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [open]);
 
+	const currentBrandSlug = useMemo(
+		() => extractBrandFromPath(pathname, localePathPrefix),
+		[pathname, localePathPrefix]
+	);
+
 	const current = useMemo(() => {
+		if (!currentBrandSlug) return null;
 		return brands.find((b) => b.brand_slug === currentBrandSlug) ?? null;
 	}, [brands, currentBrandSlug]);
+
+	const currentLabel = current?.name_zh_hk || current?.name_en || currentBrandSlug || "Brands";
 
 	const filtered = useMemo(() => {
 		const s = q.trim().toLowerCase();
@@ -54,8 +70,6 @@ export default function BrandSwitcher({
 		});
 	}, [brands, q]);
 
-	const currentLabel = current?.name_zh_hk || current?.name_en || currentBrandSlug;
-
 	return (
 		<>
 			<button
@@ -65,8 +79,8 @@ export default function BrandSwitcher({
 					"inline-flex items-center gap-2",
 					"rounded-full border border-[color:var(--surface-border)]",
 					"bg-[color:var(--cell-1)] px-4 py-2",
-					"text-xs tracking-[0.22em] uppercase text-[color:var(--txt-2)]",
-					"transition hover:bg-[color:var(--cell-2)]",
+					"text-xs tracking-[0.22em] uppercase",
+					"text-[color:var(--txt-2)] transition hover:bg-[color:var(--cell-2)]",
 					"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 				].join(" ")}
 				aria-haspopup="dialog"
@@ -91,12 +105,10 @@ export default function BrandSwitcher({
 						className={[
 							"w-full max-w-2xl overflow-hidden",
 							"rounded-3xl border border-[color:var(--surface-border)]",
-							"bg-[color:var(--cell-1)]",
-							"shadow-[var(--shadow-elev-1)]",
+							"bg-[color:var(--cell-1)] shadow-[var(--shadow-elev-1)]",
 						].join(" ")}
 						onMouseDown={(e) => e.stopPropagation()}
 					>
-						{/* Top bar */}
 						<div className="flex items-center justify-between gap-4 border-b border-[color:var(--surface-border)] px-5 py-4 sm:px-6">
 							<div className="min-w-0">
 								<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
@@ -123,7 +135,6 @@ export default function BrandSwitcher({
 							</button>
 						</div>
 
-						{/* Search */}
 						<div className="px-5 py-4 sm:px-6">
 							<input
 								value={q}
@@ -138,18 +149,15 @@ export default function BrandSwitcher({
 									"focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
 								].join(" ")}
 							/>
-							<p className="mt-2 text-xs text-[color:var(--txt-3)]">
-								Type to filter. Press Esc to close.
-							</p>
+							<p className="mt-2 text-xs text-[color:var(--txt-3)]">Type to filter. Press Esc to close.</p>
 						</div>
 
-						{/* List */}
 						<div className="max-h-[52vh] overflow-auto border-t border-[color:var(--surface-border)]">
 							<ul className="divide-y divide-[color:var(--surface-border)]">
 								{filtered.map((b) => {
 									const label = b.name_zh_hk || b.name_en || b.brand_slug;
 									const href = `${localePathPrefix}/${b.brand_slug}`;
-									const active = b.brand_slug === currentBrandSlug;
+									const active = currentBrandSlug === b.brand_slug;
 
 									return (
 										<li key={b.brand_slug}>
@@ -157,18 +165,14 @@ export default function BrandSwitcher({
 												href={href}
 												onClick={() => setOpen(false)}
 												className={[
-													"flex items-center justify-between gap-4",
-													"px-5 py-4 sm:px-6",
-													"transition",
-													"hover:bg-[color:var(--cell-2)]",
+													"flex items-center justify-between gap-4 px-5 py-4 sm:px-6",
+													"transition hover:bg-[color:var(--cell-2)]",
 													"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 												].join(" ")}
 												aria-current={active ? "page" : undefined}
 											>
 												<div className="min-w-0">
-													<div className="truncate text-sm font-medium text-[color:var(--txt-1)]">
-														{label}
-													</div>
+													<div className="truncate text-sm font-medium text-[color:var(--txt-1)]">{label}</div>
 													<div className="mt-1 text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
 														{b.brand_slug}
 													</div>
@@ -178,11 +182,9 @@ export default function BrandSwitcher({
 													<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-3 py-1 text-xs font-semibold tabular-nums text-[color:var(--txt-1)]">
 														{formatInt(b.listing_count)}
 													</span>
+
 													{active ? (
-														<span
-															className="text-xs font-semibold"
-															style={{ color: "var(--accent-1)" }}
-														>
+														<span className="text-xs font-semibold" style={{ color: "var(--accent-1)" }}>
 															Current
 														</span>
 													) : (
