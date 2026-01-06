@@ -74,6 +74,8 @@ export default function ModelMergeAdminPage() {
 	const [unprocessedCount, setUnprocessedCount] = useState<number | null>(null);
 	const [processingCount, setProcessingCount] = useState<number | null>(null);
 	const [failedCount, setFailedCount] = useState<number | null>(null);
+	const [lastSucc, setLastSucc] = useState<string | null>(null);
+	const [lastFail, setLastFail] = useState<string | null>(null);
 	const [chatUsage, setChatUsage] = useState<{
 		input: number;
 		output: number;
@@ -98,14 +100,20 @@ export default function ModelMergeAdminPage() {
 					const count = Number((data as { count?: unknown }).count);
 					const processing = Number((data as { processing?: unknown }).processing);
 					const failed = Number((data as { failed?: unknown }).failed);
+					const lastSuccVal = (data as { last_succ?: unknown }).last_succ;
+					const lastFailVal = (data as { last_fail?: unknown }).last_fail;
 					setUnprocessedCount(Number.isFinite(count) ? count : null);
 					setProcessingCount(Number.isFinite(processing) ? processing : null);
 					setFailedCount(Number.isFinite(failed) ? failed : null);
+					setLastSucc(typeof lastSuccVal === "string" ? lastSuccVal : null);
+					setLastFail(typeof lastFailVal === "string" ? lastFailVal : null);
 				})
 				.catch(() => {
 					setUnprocessedCount(null);
 					setProcessingCount(null);
 					setFailedCount(null);
+					setLastSucc(null);
+					setLastFail(null);
 				});
 			fetch("/api/chatgpt/usage", { cache: "no-store" })
 				.then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -315,6 +323,18 @@ export default function ModelMergeAdminPage() {
 									<>
 										<span className="h-1 w-1 rounded-full bg-[color:var(--accent-1)]/50" aria-hidden />
 										Failed: {failedCount}
+									</>
+								) : null}
+								{lastSucc ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-[color:var(--accent-1)]/50" aria-hidden />
+										Last succ: {lastSucc}
+									</>
+								) : null}
+								{lastFail ? (
+									<>
+										<span className="h-1 w-1 rounded-full bg-[color:var(--accent-1)]/50" aria-hidden />
+										Last fail: {lastFail}
 									</>
 								) : null}
 							</span>

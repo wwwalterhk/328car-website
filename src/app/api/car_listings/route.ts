@@ -148,10 +148,19 @@ export async function GET(request: NextRequest) {
            FROM car_listings`
 				)
 				.first<{ pending: number; processing: number; failed: number }>();
+			const last = await db
+				.prepare(
+					`SELECT
+             (SELECT MAX(updated_at) FROM chatgpt_batch_items WHERE status = 'completed') AS last_succ,
+             (SELECT MAX(updated_at) FROM chatgpt_batch_items WHERE status = 'failed') AS last_fail`
+				)
+				.first<{ last_succ: string | null; last_fail: string | null }>();
 			return NextResponse.json({
 				count: row?.pending ?? 0,
 				processing: row?.processing ?? 0,
 				failed: row?.failed ?? 0,
+				last_succ: last?.last_succ ?? null,
+				last_fail: last?.last_fail ?? null,
 			});
 		} catch (error) {
 			return NextResponse.json({ error: "Failed to load count", details: `${error}` }, { status: 500 });
