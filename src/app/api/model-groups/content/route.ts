@@ -171,7 +171,7 @@ function buildRequest(row: Row, model: string) {
 
 Tone: premium, modern, controlled, visual; avoid slogans and exaggeration.
 
-Output: {"heading":"heading in 3-12 chars, no model name", subheading:"exactly 2-3 sentences (no title, no bullets), 70–110 Chinese characters total", "keywords":"comma-separated english simple model name keywords, no spaces, max 15 keywords, to search and assign the model for system, e.g. 320i, 458, clubman, Freed, Civic etc."}`;
+Output: {"heading":"heading in 3-12 chars, no model name", subheading:"exactly 2-3 sentences (no title, no bullets), 70–110 Chinese characters total", "keywords":"comma-separated english simple model name keywords, no spaces, max 3 keywords model speific, not general, for searching and assign the model for system, e.g. 320i, 458, clubman, Freed, Civic etc.", "summary":"a long buyer introduction summary for the model series. may be some paragraphs."}`;
 
 	return {
 		custom_id: `model_group_content::${row.brand_slug}::${row.group_slug}`,
@@ -258,6 +258,7 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 		heading: string | null;
 		subheading: string | null;
 		keywords: string | null;
+		summary: string | null;
 	}> = [];
 
 	for (const line of parsed) {
@@ -272,9 +273,9 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 			continue;
 		}
 
-		const parsedText = parseHeadingSubheading(text);
-		if (!parsedText.heading && !parsedText.subheading) {
-			await markItemFailed(db, batchId, customId, "Parsed result missing heading/subheading");
+		const parsedText = parseGroupContent(text);
+		if (!parsedText.heading && !parsedText.subheading && !parsedText.summary) {
+			await markItemFailed(db, batchId, customId, "Parsed result missing heading/subheading/summary");
 			continue;
 		}
 
@@ -283,10 +284,18 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 				`UPDATE model_groups
          SET heading = COALESCE(?, heading),
              subheading = COALESCE(?, subheading),
-             keywords = COALESCE(?, keywords)
+             keywords = COALESCE(?, keywords),
+             summary = COALESCE(?, summary)
          WHERE brand_slug = ? AND group_slug = ?`
 			)
-			.bind(parsedText.heading ?? null, parsedText.subheading ?? null, parsedText.keywords ?? null, brand_slug, group_slug)
+			.bind(
+				parsedText.heading ?? null,
+				parsedText.subheading ?? null,
+				parsedText.keywords ?? null,
+				parsedText.summary ?? null,
+				brand_slug,
+				group_slug
+			)
 			.run();
 
 		await db
@@ -304,6 +313,7 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 			heading: parsedText.heading ?? null,
 			subheading: parsedText.subheading ?? null,
 			keywords: parsedText.keywords ?? null,
+			summary: parsedText.summary ?? null,
 		});
 	}
 
@@ -349,16 +359,23 @@ async function processBatchCheck(opts: { env: unknown; db: D1Database; batchId: 
 	return { ok: true, status, summary_status, batch_id: batchId, results, errors };
 }
 
-function parseHeadingSubheading(text: string): { heading: string | null; subheading: string | null; keywords: string | null } {
+function parseGroupContent(text: string): {
+	heading: string | null;
+	subheading: string | null;
+	keywords: string | null;
+	summary: string | null;
+} {
 	const trimmed = text.trim();
 	let heading: string | null = null;
 	let subheading: string | null = null;
 	let keywords: string | null = null;
-	if (!trimmed) return { heading: null, subheading: null, keywords: null };
-	const parsed = safeJsonParse<{ heading?: unknown; subheading?: unknown; keywords?: unknown }>(trimmed);
+	let summary: string | null = null;
+	if (!trimmed) return { heading: null, subheading: null, keywords: null, summary: null };
+	const parsed = safeJsonParse<{ heading?: unknown; subheading?: unknown; keywords?: unknown; summary?: unknown }>(trimmed);
 	if (parsed) {
 		if (typeof parsed.heading === "string") heading = parsed.heading.trim();
 		if (typeof parsed.subheading === "string") subheading = parsed.subheading.trim();
+		if (typeof parsed.summary === "string") summary = parsed.summary.trim();
 		if (typeof parsed.keywords === "string") keywords = parsed.keywords.trim();
 		else if (Array.isArray(parsed.keywords)) {
 			const joined = parsed.keywords
@@ -367,14 +384,15 @@ function parseHeadingSubheading(text: string): { heading: string | null; subhead
 				.join(",");
 			keywords = joined || null;
 		}
-		if (heading || subheading || keywords) return { heading: heading || null, subheading: subheading || null, keywords };
+		if (heading || subheading || keywords || summary)
+			return { heading: heading || null, subheading: subheading || null, keywords, summary: summary || null };
 	}
 	// Fallback: treat first line as heading (short) and remainder as subheading
 	const [first, ...rest] = trimmed.split("\n").map((s) => s.trim()).filter(Boolean);
 	if (first) heading = first.length <= 12 ? first : first.slice(0, 12);
 	if (rest.length) subheading = rest.join(" ").trim();
 	else if (!heading) subheading = trimmed;
-	return { heading: heading || null, subheading: subheading || null, keywords: null };
+	return { heading: heading || null, subheading: subheading || null, keywords: null, summary: null };
 }
 
 function parseCustomId(customId: string): { brand_slug: string | null; group_slug: string | null } {
