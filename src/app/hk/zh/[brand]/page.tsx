@@ -236,6 +236,7 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 	if (!models.length) notFound();
 
 	const brandTitle = models[0]?.name_zh_hk || models[0]?.name_en || brand;
+	const brandTitleEn = models[0]?.name_en || brand;
 	const totalListings = models.reduce((acc, m) => acc + (m.listing_count || 0), 0);
 
 	const introText =
@@ -314,6 +315,11 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 							<h1 className="text-4xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-5xl">
 								{brandTitle}
 							</h1>
+							{brandTitleEn && brandTitleEn !== brandTitle ? (
+								<div className="text-xs font-semibold tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
+									{brandTitleEn}
+								</div>
+							) : null}
 
 							<p className="max-w-3xl text-sm leading-relaxed text-[color:var(--txt-2)]">
 								{introText}
