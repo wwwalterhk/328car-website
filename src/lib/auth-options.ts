@@ -21,7 +21,7 @@ async function persistOauthUser(user: User, account: Account | null, profile?: P
 	const email = readString(user.email) ?? readString(profile?.email);
 	if (!email) return;
 
-	const name = readString(user.name) ?? readString(profile?.name);
+	const name = getProfileName(profile) ?? readString(user.name);
 	const avatarUrl = readString(user.image) ?? readString(getProfilePicture(profile));
 	const locale = readString(getProfileLocale(profile));
 
@@ -30,8 +30,8 @@ async function persistOauthUser(user: User, account: Account | null, profile?: P
 			`INSERT INTO users (email, name, avatar_url, locale)
        VALUES (?, ?, ?, ?)
        ON CONFLICT(email) DO UPDATE SET
-         name = excluded.name,
-         avatar_url = excluded.avatar_url,
+         name = COALESCE(excluded.name, users.name),
+         avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
          locale = COALESCE(excluded.locale, users.locale),
          updated_at = datetime('now')`
 		)
@@ -81,6 +81,18 @@ function getProfileLocale(profile?: Profile): string | null {
 	if (!profile) return null;
 	const record = profile as Record<string, unknown>;
 	return readString(record.locale);
+}
+
+function getProfileName(profile?: Profile): string | null {
+	if (!profile) return null;
+	// Apple may send name as string, or as an object with firstName/lastName or givenName/familyName on first login.
+	const record = profile as Record<string, unknown>;
+	const direct = readString(record.name);
+	if (direct) return direct;
+	const first = readString(record.firstName) ?? readString(record.given_name) ?? readString(record.givenName);
+	const last = readString(record.lastName) ?? readString(record.family_name) ?? readString(record.familyName);
+	const composed = [first, last].filter(Boolean).join(" ").trim();
+	return composed || null;
 }
 
 export const authOptions: NextAuthOptions = {
