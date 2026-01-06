@@ -21,6 +21,7 @@ type ModelRow = {
 	group_subheading: string | null;
 	group_summary: string | null;
 	power: string | null;
+	start_price: number | null;
 };
 
 function formatInt(n: number) {
@@ -37,6 +38,12 @@ function yearRange(min: number | null, max: number | null) {
 	if (!min && max) return `–${max}`;
 	if (min === max) return `${min}`;
 	return `${min}–${max}`;
+}
+
+function formatPrice(value: number | null): string | null {
+	if (typeof value !== "number" || !Number.isFinite(value)) return null;
+	const rounded = Math.round(value);
+	return `HKD $${rounded.toLocaleString("en-HK")}`;
 }
 
 async function loadBrandIntro(brandSlug: string, locale: string): Promise<string | null> {
@@ -113,6 +120,7 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         m.model_name_slug,
         m.manu_model_code,
         m.power,
+        MIN(COALESCE(c.discount_price, c.price)) AS start_price,
         MIN(c.year) AS min_year,
         MAX(c.year) AS max_year,
         m.model_groups_pk,
@@ -158,6 +166,7 @@ function ModelCard({ model }: { model: ModelRow }) {
 	const name = model.model_name || model.model_name_slug || "Unknown model";
 	const years = yearRange(model.min_year, model.max_year);
 	const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
+	const startPrice = formatPrice(model.start_price);
 
 	return (
 		<Link
@@ -191,7 +200,7 @@ function ModelCard({ model }: { model: ModelRow }) {
 						Start from
 					</div>
 					<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
-						HKD $88,000
+						{startPrice || "待更新"}
 					</div>
 				</div>
 			</div>
@@ -362,7 +371,9 @@ export default async function BrandModelsPage({ params }: { params: Promise<{ br
 						</h2>
 
 						<div className="mt-10 space-y-12">
-							{Array.from(grouped.entries()).map(([pk, group]) => (
+							{Array.from(grouped.entries())
+								.sort((a, b) => (a[1].name || "").localeCompare(b[1].name || ""))
+								.map(([pk, group]) => (
 								<div key={pk} className="space-y-4">
 									<div className="space-y-2">
 										<div className="text-xs tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
