@@ -62,7 +62,7 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         AND m.power != 'electric'
       GROUP BY
         m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
-      ORDER BY listing_count DESC`
+      ORDER BY listing_count DESC LIMIT 9`
 		)
 		.all<ModelRow>();
 
@@ -95,7 +95,7 @@ async function loadElectricModelsSummary(): Promise<ModelRow[]> {
         AND m.power = 'electric'
       GROUP BY
         m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
-      ORDER BY listing_count DESC`
+      ORDER BY listing_count DESC LIMIT 9`
 		)
 		.all<ModelRow>();
 
@@ -129,7 +129,7 @@ async function loadClassicModelsSummary(): Promise<ModelRow[]> {
         AND c.year < CAST(strftime('%Y', 'now', '-30 years') AS INTEGER)
       GROUP BY
         m.model_name_slug, b.slug, b.name_en, b.name_zh_hk, m.model_name
-      ORDER BY listing_count DESC`
+      ORDER BY listing_count DESC LIMIT 9`
 		)
 		.all<ModelRow>();
 
@@ -198,12 +198,8 @@ function SectionHeader({
 			<SectionPill>{pill}</SectionPill>
 
 			<div className="space-y-3">
-				<h2 className="text-2xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-3xl">
-					{title}
-				</h2>
-				<p className="max-w-2xl text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">
-					{subtitle}
-				</p>
+				<h2 className="text-2xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-3xl">{title}</h2>
+				<p className="max-w-2xl text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">{subtitle}</p>
 			</div>
 
 			{countLabel ? (
@@ -228,16 +224,16 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 			key={`${model.brand_slug}-${model.model_name_slug ?? model.model_name ?? "model"}`}
 			href={href}
 			className={[
-				"group relative block",
-				"rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
+				"block",
+				"rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
 				"p-5 transition",
-				"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
+				"hover:bg-[color:var(--cell-2)]",
 				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 			].join(" ")}
 		>
 			<div className="flex items-start justify-between gap-4">
 				<div className="flex min-w-0 items-start gap-4">
-					<div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
+					<div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
 						<BrandLogo
 							slug={model.brand_slug}
 							alt={`${brandLabel} logo`}
@@ -247,9 +243,7 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 					</div>
 
 					<div className="min-w-0">
-						<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
-							{brandLabel}
-						</div>
+						<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">{brandLabel}</div>
 
 						<div className="mt-1 truncate text-lg font-semibold tracking-tight text-[color:var(--txt-1)]">
 							{modelLabel}
@@ -267,14 +261,9 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 							) : null}
 						</div>
 
-						{/* Quiet-luxury placeholder pricing */}
-						<div className="mt-4">
-							<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
-								Start from
-							</div>
-							<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
-								HKD $88,000
-							</div>
+						<div className="mt-4 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-4 py-3">
+							<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">Start from</div>
+							<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">HKD $88,000</div>
 						</div>
 					</div>
 				</div>
@@ -292,6 +281,54 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 					{formatInt(model.listing_count)}
 				</div>
 			</div>
+		</Link>
+	);
+}
+
+function SoftButton({
+	href,
+	children,
+}: {
+	href: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<Link
+			href={href}
+			className={[
+				"inline-flex items-center justify-center gap-2",
+				"rounded-full border border-[color:var(--surface-border)]",
+				"bg-[color:var(--cell-1)] px-5 py-3",
+				"text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-2)]",
+				"transition hover:bg-[color:var(--cell-2)]",
+				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+			].join(" ")}
+		>
+			{children}
+		</Link>
+	);
+}
+
+function PrimaryButton({
+	href,
+	children,
+}: {
+	href: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<Link
+			href={href}
+			className={[
+				"inline-flex items-center justify-center gap-2",
+				"rounded-full",
+				"bg-[color:var(--accent-1)] px-5 py-3",
+				"text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--on-accent-1)]",
+				"transition hover:opacity-90",
+				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+			].join(" ")}
+		>
+			{children}
 		</Link>
 	);
 }
@@ -319,34 +356,130 @@ export default async function Home() {
 				}}
 			/>
 
-			{/* Match brand page container exactly */}
 			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
-				{/* HERO */}
+				{/* HERO (AI search + member access) */}
 				<section className="space-y-6">
-					<SectionPill>In Stock</SectionPill>
+					{/* Row 1: AI Search (full width) */}
+					<div className="">
+						<div className="space-y-4">
+							<SectionPill>AI Search</SectionPill>
 
-					<div className="space-y-3">
-						<h1 className="text-3xl font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
-							Latest models with active inventory
-						</h1>
-						<p className="max-w-2xl text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">
-							Shop what is available now. Listings are refreshed and ranked by the most active models in the
-							last 12 months.
-						</p>
+							<div className="space-y-3">
+								<h1 className="font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
+									Find the right car in one line.
+								</h1>
+								<p className="text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">
+									Describe what you want — model, budget, year, body style — and explore active listings with market context.
+								</p>
+							</div>
+
+							{/* Option A: wider input, trailing button */}
+							<form
+								action="#"
+								method="GET"
+								className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-3)] p-3 sm:p-4"
+							>
+								<div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-3)]">
+									Ask in natural language
+								</div>
+
+								<div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+									<div className="flex-1">
+										<input
+											name="q"
+											type="text"
+											placeholder='e.g. “Porsche 911 under HK$900k, 2018+, PDK”'
+											className={[
+												"w-full h-12 sm:h-11",
+												"rounded-2xl border border-[color:var(--surface-border)]",
+												"bg-[color:var(--cell-1)] px-4",
+												"text-sm text-[color:var(--txt-1)] outline-none",
+												"transition",
+												"focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
+											].join(" ")}
+										/>
+										<div className="mt-2 text-xs text-[color:var(--txt-3)]">
+											Try budget, year range, body style, or a specific trim.
+										</div>
+									</div>
+
+									<button
+										type="submit"
+										className={[
+											"shrink-0 h-12 sm:h-11",
+											"rounded-2xl bg-[color:var(--accent-1)] px-6",
+											"text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--on-accent-1)]",
+											"transition hover:opacity-90",
+											"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
+										].join(" ")}
+									>
+										Search <span aria-hidden>→</span>
+									</button>
+								</div>
+							</form>
+
+							<div className="flex flex-wrap gap-2">
+								<SoftButton href="#brands">Browse brands</SoftButton>
+								<SoftButton href="#featured">See featured models</SoftButton>
+							</div>
+						</div>
 					</div>
 
-					<div>
-						<AuthStatus />
+					{/* Row 2: Member access + Placeholder feature */}
+					<div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+						{/* Member access (compact) */}
+						<aside className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5 sm:p-6">
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--txt-3)]">
+										Member access
+									</div>
+									<p className="text-sm leading-relaxed text-[color:var(--txt-2)]">
+										Sign in to save searches, track listings, and unlock deeper browsing.
+									</p>
+								</div>
+
+								<div className="grid gap-2">
+									<AuthStatus />
+								</div>
+
+							</div>
+						</aside>
+
+						{/* Placeholder feature (suggested function) */}
+						<aside className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5 sm:p-6">
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--txt-3)]">
+										咖啡時間
+									</div>
+									<p className="text-sm leading-relaxed text-[color:var(--txt-2)]">
+										Short, thoughtful updates on cars, tech, and the market—edited for a quieter, faster read.
+									</p>
+								</div>
+
+							
+
+								<div className="flex flex-wrap gap-2">
+									<SoftButton href="#">Explore market brief</SoftButton>
+									<SoftButton href="#">Learn more</SoftButton>
+								</div>
+							</div>
+						</aside>
 					</div>
 
 					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.26em] text-[color:var(--txt-3)]">
 						<span className="h-px w-10 bg-[color:var(--surface-border)]" aria-hidden />
-						{totalModels} models
+						Featured models (12m activity)
 					</div>
 				</section>
 
+
+				{/* FEATURED (anchor) */}
+				<div id="featured" className="mt-12 border-t border-[color:var(--surface-border)] pt-10" />
+
 				{/* ELECTRIC */}
-				<section className="mt-12 border-t border-[color:var(--surface-border)] pt-10">
+				<section>
 					<SectionHeader
 						pill="Electric"
 						title="Electric models"
@@ -365,9 +498,7 @@ export default async function Home() {
 					</div>
 
 					{electricTop.length === 0 ? (
-						<p className="mt-8 text-sm text-[color:var(--txt-3)]">
-							No active EV listings found. Check your D1 data or update schedule.
-						</p>
+						<p className="mt-8 text-sm text-[color:var(--txt-3)]">No active EV listings found.</p>
 					) : null}
 				</section>
 
@@ -391,9 +522,7 @@ export default async function Home() {
 					</div>
 
 					{traditionalTop.length === 0 ? (
-						<p className="mt-8 text-sm text-[color:var(--txt-3)]">
-							No active traditional listings found. Check your D1 data or update schedule.
-						</p>
+						<p className="mt-8 text-sm text-[color:var(--txt-3)]">No active traditional listings found.</p>
 					) : null}
 				</section>
 
@@ -417,18 +546,16 @@ export default async function Home() {
 					</div>
 
 					{classicTop.length === 0 ? (
-						<p className="mt-8 text-sm text-[color:var(--txt-3)]">
-							No classic listings found. Check your D1 data or update schedule.
-						</p>
+						<p className="mt-8 text-sm text-[color:var(--txt-3)]">No classic listings found.</p>
 					) : null}
 				</section>
 
 				{/* BRANDS */}
-				<section className="mt-16 border-t border-[color:var(--surface-border)] pt-10">
+				<section id="brands" className="mt-16 border-t border-[color:var(--surface-border)] pt-10">
 					<SectionHeader
 						pill="Brands"
-						title="Discover cars, trims, and real market details"
-						subtitle="Start with a brand to see models, specs, and listing insights curated for the Hong Kong market."
+						title="Start with a brand"
+						subtitle="Explore models, trims, and real inventory signals — curated for the Hong Kong market."
 						countLabel={`${brands.length} brands`}
 					/>
 
@@ -442,31 +569,19 @@ export default async function Home() {
 									key={brand.slug}
 									href={`/hk/zh/${brand.slug}`}
 									className={[
-										"group flex items-center gap-4",
-										"rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
-										"p-5 transition",
-										"hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
+										"flex items-center gap-4",
+										"rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)]",
+										"p-5 transition hover:bg-[color:var(--cell-2)]",
 										"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
 									].join(" ")}
 								>
-									<div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
-										<BrandLogo
-											slug={brand.slug}
-											alt={`${title} logo`}
-											size={40}
-											className="h-10 w-10 object-contain"
-										/>
+									<div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)]">
+										<BrandLogo slug={brand.slug} alt={`${title} logo`} size={40} className="h-10 w-10 object-contain" />
 									</div>
 
 									<div className="min-w-0">
-										<div className="truncate text-base font-semibold tracking-tight text-[color:var(--txt-1)]">
-											{title}
-										</div>
-
-										<div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[color:var(--txt-3)]">
-											{brand.slug}
-										</div>
-
+										<div className="truncate text-base font-semibold tracking-tight text-[color:var(--txt-1)]">{title}</div>
+										<div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-[color:var(--txt-3)]">{brand.slug}</div>
 										{locale ? <div className="mt-1 text-xs text-[color:var(--txt-2)]">{locale}</div> : null}
 									</div>
 								</Link>
@@ -475,13 +590,10 @@ export default async function Home() {
 					</div>
 
 					{brands.length === 0 ? (
-						<p className="mt-10 text-sm text-[color:var(--txt-3)]">
-							No brands found. Check your D1 binding or seed data.
-						</p>
+						<p className="mt-10 text-sm text-[color:var(--txt-3)]">No brands found.</p>
 					) : null}
 				</section>
 			</div>
 		</main>
 	);
 }
-

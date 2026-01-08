@@ -54,6 +54,7 @@ async function loadVariants(brandSlug: string, modelNameSlug: string): Promise<V
       WHERE
         c.sts = 1
         AND c.model_sts = 1
+		AND m.manu_model_code is NOT NULL 
         AND c.last_update_datetime > datetime('now', '-1 year')
         AND b.slug = ?
         AND m.model_name_slug = ?
@@ -237,8 +238,8 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 									>
 										<div className="flex items-start justify-between gap-4">
 											<div className="min-w-0">
-												<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">
-													{row.model_slug || row.model_name_slug || "Variant"}
+												<div className="mt-1 truncate tracking-tight text-[color:var(--txt-2)]">
+													<span>{yearText}</span>
 												</div>
 
 												<div className="mt-1 truncate text-lg font-semibold tracking-tight text-[color:var(--txt-1)]">
@@ -246,8 +247,6 @@ export default async function ModelVariantsPage({ params }: PageProps) {
 												</div>
 
 												<div className="mt-2 text-xs text-[color:var(--txt-2)]">
-													<span className="text-[color:var(--txt-3)]">{yearText}</span>
-													<span className="mx-2 text-[color:var(--txt-3)]">·</span>
 													<span className="text-[color:var(--txt-2)]">{powerText || "—"}</span>
 												</div>
 											</div>

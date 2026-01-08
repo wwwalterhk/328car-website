@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS car_listings (
   last_update_datetime TEXT,
   vehicle_type TEXT,
   sold INTEGER, -- 0/1
-  sts INTEGER DEFAULT 1, -- 0=disabled/1=enabled
+  sts INTEGER DEFAULT 1, -- 0=disabled, 1=enabled, 2=pending inspection
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (site, id)
 );
@@ -97,15 +97,25 @@ CREATE INDEX IF NOT EXISTS idx_car_listings_photo_listing
 -- Model catalogue (normalized plus raw JSON blob)
 CREATE TABLE IF NOT EXISTS models (
   model_pk INTEGER PRIMARY KEY AUTOINCREMENT,
-  merged_to_model_pk INTEGER,
   brand TEXT,
   brand_slug TEXT NOT NULL,
   model_slug TEXT,
+  model_name TEXT,
+  model_name_slug TEXT,
+  detail_model_name TEXT,
+  detail_model_name_slug TEXT,
   manu_model_code TEXT,
+  manu_model_code_slug TEXT,
   body_type TEXT,
   engine_cc TEXT,
   power_kw TEXT,
+  engine_cc_100_int INTEGER,
+  power_kw_100_int INTEGER,
+  output_100 TEXT,
+  output_100_decimal TEXT,
   horse_power_ps TEXT,
+  model_groups_pk INTEGER,
+  merged_to_model_pk INTEGER,
   range TEXT,
   manu_country TEXT,
   power TEXT,
@@ -115,24 +125,29 @@ CREATE TABLE IF NOT EXISTS models (
   transmission_gears TEXT,
   mileage_km INTEGER,
   mileage_km_ai INTEGER,
-  model_name TEXT,
-  model_name_slug TEXT,
   manu_color_name TEXT,
   gen_color_name TEXT,
   gen_color_code TEXT,
   remark TEXT,
   tech_remark TEXT,
-  model_groups_pk INTEGER,
+  db_remark TEXT,
   raw_json TEXT, -- original JSON payload for audit/debug
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (brand_slug, model_slug),
-  UNIQUE (brand_slug, manu_model_code, model_name)
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_models_brand_code
-  ON models (brand_slug, manu_model_code);
+  ON models (brand_slug, manu_model_code_slug);
+
+CREATE UNIQUE INDEX idx_models_model_slug_unique
+  ON models(brand_slug, model_slug);
+
+CREATE UNIQUE INDEX idx_models_model_unique
+  ON models(brand_slug, manu_model_code_slug, model_name_slug, output_100, power, body_type);
 
 CREATE INDEX IF NOT EXISTS idx_models_model_name_slug ON models (model_name_slug);
+CREATE INDEX IF NOT EXISTS idx_models_detail_model_name_slug ON models (detail_model_name_slug);
+CREATE INDEX IF NOT EXISTS idx_models_body_type ON models (body_type);
+CREATE INDEX IF NOT EXISTS idx_models_output_100 ON models (output_100);
 
 CREATE INDEX IF NOT EXISTS idx_models_model_groups_pk ON models(model_groups_pk);
 
@@ -149,6 +164,15 @@ CREATE TABLE IF NOT EXISTS models_item (
   UNIQUE (model_pk, locale, item)
 );
 
+-- CREATE TABLE IF NOT EXISTS model_names (
+--   model_name_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+--   brand_slug TEXT NOT NULL,
+--   model_name_slug TEXT NOT NULL,
+--   model_name TEXT NOT NULL,
+--   model_sts INTEGER NOT NULL DEFAULT 0,
+--   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+--   UNIQUE (model_name_slug, brand_slug)
+-- );
 
 CREATE TABLE IF NOT EXISTS model_groups (
   model_groups_pk INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -140,10 +140,11 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
       WHERE
         c.sts = 1
         AND c.model_sts = 1
+		AND m.manu_model_code is NOT NULL 
         AND c.last_update_datetime > datetime('now', '-1 year')
         AND b.slug = ?
       GROUP BY
-        m.model_name_slug, m.manu_model_code
+        m.model_name_slug
       ORDER BY min_year DESC, m.model_name, m.power`
 		)
 		.bind(brandSlug)

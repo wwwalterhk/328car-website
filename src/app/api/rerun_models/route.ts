@@ -1,14 +1,9 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 type BatchRow = {
-	batch_id: string;
-	status: string | null;
-	submitted_at: string | null;
-	completed_at: string | null;
-	failed_at: string | null;
-	updated_at: string | null;
-	error_message: string | null;
+	listing_pk: string;
+	json: string | null;
 };
 
 type BatchApiResponse = {
@@ -27,16 +22,23 @@ type BatchApiResponse = {
 };
 
 const SELECT_PENDING_BATCHES = `
-SELECT batch_id, status, submitted_at, completed_at, failed_at, updated_at, error_message
-FROM chatgpt_batches
-WHERE completed_at IS NULL
-  AND failed_at IS NULL
-  AND (batch_id NOT LIKE 'brand_content::%' AND batch_id LIKE 'batch_%')
-ORDER BY submitted_at DESC
-LIMIT 100
-`;
+select * from (
+SELECT b.listing_pk,
+  json_extract(json(result_json), '$.body.output[0].content[0].text') AS json
+FROM chatgpt_batch_items b
+  inner join car_listings c on b.listing_pk = c.listing_pk
+WHERE error_message IS NULL
+  AND result_json IS NOT NULL
+  AND status = 'completed'
+  AND b.listing_pk in (select listing_pk from car_listings where model_pk is null and sts=1 and model_sts=0)
 
-export async function GET() {
+ORDER BY item_pk ASC
+)
+LIMIT ?
+`;
+type UpdateTuple = [listing_pk: string, result: Awaited<ReturnType<typeof applyModelOutput>>];
+
+export async function GET(request: NextRequest) {
 	const { env } = await getCloudflareContext({ async: true });
 	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
 	if (!db) {
@@ -45,6 +47,10 @@ export async function GET() {
 			{ status: 500 }
 		);
 	}
+
+  	const { searchParams } = new URL(request.url);
+  	//const listing_pk = (searchParams.get("listing_pk") || "");
+  	const limit = (searchParams.get("limit") || "1");
 
 	const apiKey = (env as CloudflareEnv & { OPENAI_API_KEY?: string }).OPENAI_API_KEY;
 	if (!apiKey) {
@@ -59,13 +65,22 @@ export async function GET() {
 		"https://api.openai.com/v1";
 
 	try {
-		const result = await db.prepare(SELECT_PENDING_BATCHES).all<BatchRow>();
+		const result = await db.prepare(SELECT_PENDING_BATCHES).bind(limit).all<BatchRow>();
 		const batches = result.results || [];
 
-		const updates = [];
+		
+
+		const updates: UpdateTuple[] = [];
+
 		for (const row of batches) {
-			const update = await pollAndUpdateBatch(db, baseUrl, apiKey, row.batch_id);
-			updates.push(update);
+			const outputText = row.json;
+			if (outputText) {
+				const parsed = safeJsonParse<unknown>(outputText);
+				if (parsed) {
+					const result =await applyModelOutput(db, parsed);
+					updates.push([row.listing_pk, result]);
+				}
+			}
 		}
 
 		return NextResponse.json({ count: batches.length, updates });
@@ -77,284 +92,7 @@ export async function GET() {
 	}
 }
 
-async function pollAndUpdateBatch(db: D1Database, baseUrl: string, apiKey: string, batchId: string) {
-	let status: string | null = null;
-	let usage: {
-		input_tokens?: number;
-		output_tokens?: number;
-		total_tokens?: number;
-	} = {};
-	let errorMessage: string | null = null;
-	let completed = false;
-	let failed = false;
-	let outputFileId: string | null | undefined = null;
-	let errorFileId: string | null | undefined = null;
 
-	try {
-		// Skip placeholder/local batch IDs that were never submitted to OpenAI.
-		if (!batchId.startsWith("batch")) {
-			errorMessage = "Skipping placeholder batch_id (not submitted to OpenAI)";
-			await db
-				.prepare(
-					`UPDATE chatgpt_batches
-         SET status = 'failed', error_message = ?, updated_at = datetime('now')
-         WHERE batch_id = ?`
-				)
-				.bind(errorMessage, batchId)
-				.run();
-
-			await db
-				.prepare(
-					`UPDATE chatgpt_batch_items
-           SET status = 'failed', updated_at = datetime('now')
-           WHERE batch_id = ? AND status IN ('pending','submitted','running')`
-				)
-				.bind(batchId)
-				.run();
-
-			return { batch_id: batchId, status: "failed", error: errorMessage };
-		}
-
-		const resp = await fetch(`${baseUrl}/batches/${batchId}`, {
-			method: "GET",
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				"Content-Type": "application/json",
-			},
-		});
-
-		const payload = (await resp.json()) as BatchApiResponse;
-
-		if (!resp.ok) {
-			throw new Error(`HTTP ${resp.status} ${JSON.stringify(payload)}`);
-		}
-
-		status = payload.status ?? null;
-		usage = normalizeBatchUsage(payload.usage);
-		outputFileId = payload.output_file_id ?? null;
-		errorFileId = payload.error_file_id ?? null;
-		if (status === "completed") completed = true;
-		if (status === "failed" || status === "cancelled" || status === "expired") failed = true;
-
-		await db
-			.prepare(
-				`UPDATE chatgpt_batches
-         SET status = ?, updated_at = datetime('now'),
-             completed_at = CASE WHEN ? THEN datetime('now') ELSE completed_at END,
-             failed_at = CASE WHEN ? THEN datetime('now') ELSE failed_at END,
-             response_json = ?,
-             usage_prompt_tokens = COALESCE(?, usage_prompt_tokens),
-             usage_completion_tokens = COALESCE(?, usage_completion_tokens),
-             usage_total_tokens = COALESCE(?, usage_total_tokens),
-             error_message = NULL
-         WHERE batch_id = ?`
-			)
-			.bind(
-				status,
-				completed ? 1 : 0,
-				failed ? 1 : 0,
-				JSON.stringify(payload),
-				usage.input_tokens ?? null,
-				usage.output_tokens ?? null,
-				usage.total_tokens ?? null,
-				batchId
-			)
-			.run();
-
-		if (completed || failed) {
-			await processBatchFiles(db, baseUrl, apiKey, batchId, outputFileId, errorFileId, failed);
-		}
-
-		return { batch_id: batchId, status, completed, failed };
-	} catch (error) {
-		errorMessage = `${error}`;
-		await db
-			.prepare(
-				`UPDATE chatgpt_batches
-         SET error_message = ?, updated_at = datetime('now')
-         WHERE batch_id = ?`
-			)
-			.bind(errorMessage, batchId)
-			.run();
-
-		// Mark in-flight items as failed on error to avoid leaving them pending indefinitely.
-		await db
-			.prepare(
-				`UPDATE chatgpt_batch_items
-         SET status = 'failed', updated_at = datetime('now')
-         WHERE batch_id = ? AND status IN ('pending','submitted','running')`
-			)
-			.bind(batchId)
-			.run();
-
-		return { batch_id: batchId, status: status ?? "error", error: errorMessage };
-	}
-}
-
-function normalizeBatchUsage(
-	usage: BatchApiResponse["usage"] | null | undefined
-): { input_tokens?: number; output_tokens?: number; total_tokens?: number } {
-	if (!usage) return {};
-	const inputTokens =
-		typeof usage.input_tokens === "number" ? usage.input_tokens : usage.prompt_tokens;
-	const outputTokens =
-		typeof usage.output_tokens === "number" ? usage.output_tokens : usage.completion_tokens;
-	return {
-		input_tokens: inputTokens,
-		output_tokens: outputTokens,
-		total_tokens: usage.total_tokens,
-	};
-}
-
-async function processBatchFiles(
-	db: D1Database,
-	baseUrl: string,
-	apiKey: string,
-	batchId: string,
-	outputFileId: string | null | undefined,
-	errorFileId: string | null | undefined,
-	batchFailed: boolean
-) {
-	const fileId = outputFileId || errorFileId;
-	if (!fileId) {
-		const fallbackStatus = batchFailed ? "failed" : errorFileId ? "failed" : "completed";
-		await db
-			.prepare(
-				`UPDATE chatgpt_batch_items
-         SET status = ?, updated_at = datetime('now')
-         WHERE batch_id = ? AND status IN ('pending','submitted','running')`
-			)
-			.bind(fallbackStatus, batchId)
-			.run();
-		if (batchFailed) {
-			await db
-				.prepare(
-					`UPDATE chatgpt_batches
-         SET failed_at = datetime('now')
-         WHERE batch_id = ? AND failed_at IS NULL`
-				)
-				.bind(batchId)
-				.run();
-
-			await db
-				.prepare(
-					`UPDATE car_listings
-           SET model_sts = 3
-           WHERE listing_pk IN (
-             SELECT listing_pk FROM chatgpt_batch_items WHERE batch_id = ? AND listing_pk IS NOT NULL
-           )`
-				)
-				.bind(batchId)
-				.run();
-		}
-		return;
-	}
-
-	const isErrorFile = Boolean(errorFileId && !outputFileId);
-
-	try {
-		const resp = await fetch(`${baseUrl}/files/${fileId}/content`, {
-			method: "GET",
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-			},
-		});
-
-		if (!resp.ok) {
-			throw new Error(`Failed to download file ${fileId}: ${resp.status} ${await resp.text()}`);
-		}
-
-		const text = await resp.text();
-		const lines = text.split("\n").filter(Boolean);
-
-		for (const line of lines) {
-			try {
-				const entry = JSON.parse(line) as {
-					custom_id?: string;
-					response?: unknown;
-					error?: unknown;
-				};
-				const customId = entry.custom_id;
-				if (!customId) continue;
-				const status = isErrorFile || entry.error ? "failed" : "completed";
-				const resultJson = JSON.stringify(entry.response ?? entry.error ?? entry);
-
-				const [site, ...rest] = customId.split("-");
-				const listingId = rest.join("-") || null;
-
-				const itemRow = await db
-					.prepare(
-						`SELECT listing_pk
-             FROM chatgpt_batch_items
-             WHERE batch_id = ? AND site = ? AND listing_id = ?
-             LIMIT 1`
-					)
-					.bind(batchId, site, listingId)
-					.first<{ listing_pk: number | null }>();
-				const hasListingPk = itemRow?.listing_pk != null;
-
-				await db
-					.prepare(
-						`UPDATE chatgpt_batch_items
-           SET status = ?, result_json = ?, error_message = CASE WHEN ? = 'failed' THEN ? ELSE NULL END, updated_at = datetime('now')
-          WHERE batch_id = ? AND site = ? AND listing_id = ?`
-					)
-					.bind(status, resultJson, status, entry.error ? JSON.stringify(entry.error) : null, batchId, site, listingId)
-					.run();
-
-				if (status === "failed" && hasListingPk && itemRow?.listing_pk != null) {
-					await markListingFailed(db, itemRow.listing_pk);
-				}
-
-				if (status === "completed") {
-					const responseRecord = isRecord(entry.response) ? entry.response : null;
-					const statusCode =
-						typeof responseRecord?.status_code === "number" ? responseRecord.status_code : null;
-					const responseBody = responseRecord?.body;
-					const outputText =
-						statusCode && statusCode >= 200 && statusCode < 300
-							? extractOutputTextFromResponseBody(responseBody)
-							: null;
-					if (outputText && hasListingPk) {
-						// Only process when listing model_pk is NULL
-						const listingModel = await db
-							.prepare("SELECT model_pk FROM car_listings WHERE site = ? AND id = ? LIMIT 1")
-							.bind(site, listingId)
-							.first<{ model_pk: number | null }>();
-						if (listingModel?.model_pk === null) {
-							const parsed = safeJsonParse<unknown>(outputText);
-							if (parsed) {
-								await applyModelOutput(db, parsed);
-							}
-						}
-					}
-				}
-			} catch (lineErr) {
-				console.warn("Failed to process batch line", { line, lineErr });
-			}
-		}
-	} catch (error) {
-		console.warn("Failed to process batch file", { batchId, fileId, error });
-		await db
-			.prepare(
-				`UPDATE chatgpt_batch_items
-         SET status = 'failed', error_message = 'Failed to download/process batch file', updated_at = datetime('now')
-         WHERE batch_id = ? AND status IN ('pending','submitted','running')`
-			)
-			.bind(batchId)
-			.run();
-		if (batchFailed) {
-			await db
-				.prepare(
-					`UPDATE chatgpt_batches
-         SET failed_at = datetime('now')
-         WHERE batch_id = ? AND failed_at IS NULL`
-				)
-				.bind(batchId)
-				.run();
-		}
-	}
-}
 /**
  * Extract the first numeric value from an unknown input.
  * - "10km" -> 10
@@ -388,7 +126,20 @@ function extractNumberNullable(
   return integer ? Math.trunc(parsed) : parsed;
 }
 
-
+function normalizeBatchUsage(
+	usage: BatchApiResponse["usage"] | null | undefined
+): { input_tokens?: number; output_tokens?: number; total_tokens?: number } {
+	if (!usage) return {};
+	const inputTokens =
+		typeof usage.input_tokens === "number" ? usage.input_tokens : usage.prompt_tokens;
+	const outputTokens =
+		typeof usage.output_tokens === "number" ? usage.output_tokens : usage.completion_tokens;
+	return {
+		input_tokens: inputTokens,
+		output_tokens: outputTokens,
+		total_tokens: usage.total_tokens,
+	};
+}
 
 // Removes a target substring (case-insensitive by default) and tidies whitespace.
 function removeStringAndTidyWhitespace(
@@ -716,36 +467,6 @@ async function applyModelOutput(db: D1Database, payload: unknown): Promise<strin
 	return JSON.stringify(out);
 }
 
-function readNullableIntegerRemoveString(value: unknown): number | null {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return Math.trunc(value);
-	}
-
-	if (typeof value === "string") {
-		const trimmed = stripParenthetical(value).trim();
-		if (!trimmed) return null;
-
-		// Remove all non-numeric characters except leading sign and a single dot
-		// Examples:
-		// "10km" -> "10"
-		// "  -12,345cc " -> "-12345"
-		// "3.8L" -> "3.8" -> 3
-		const cleaned = trimmed
-			.replace(/,/g, "")
-			.replace(/(?!^)[+\-]/g, "")       // keep sign only at start
-			.replace(/[^0-9+\-\.]/g, "")      // keep digits, sign, dot
-			.replace(/(\..*)\./g, "$1");      // keep only the first dot
-
-		if (!cleaned || cleaned === "+" || cleaned === "-" || cleaned === "." || cleaned === "+." || cleaned === "-.") {
-			return null;
-		}
-
-		const parsed = Number(cleaned);
-		if (Number.isFinite(parsed)) return Math.trunc(parsed);
-	}
-
-	return null;
-}
 async function markListingFailed(db: D1Database, listingPk: number) {
 	await db.prepare("UPDATE car_listings SET model_sts = 3 WHERE listing_pk = ?").bind(listingPk).run();
 }
@@ -889,6 +610,36 @@ function readSanitizedNullableText(value: unknown): string | null {
 	if (typeof value === "number" && Number.isFinite(value)) {
 		return String(value);
 	}
+	return null;
+}
+function readNullableIntegerRemoveString(value: unknown): number | null {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return Math.trunc(value);
+	}
+
+	if (typeof value === "string") {
+		const trimmed = stripParenthetical(value).trim();
+		if (!trimmed) return null;
+
+		// Remove all non-numeric characters except leading sign and a single dot
+		// Examples:
+		// "10km" -> "10"
+		// "  -12,345cc " -> "-12345"
+		// "3.8L" -> "3.8" -> 3
+		const cleaned = trimmed
+			.replace(/,/g, "")
+			.replace(/(?!^)[+\-]/g, "")       // keep sign only at start
+			.replace(/[^0-9+\-\.]/g, "")      // keep digits, sign, dot
+			.replace(/(\..*)\./g, "$1");      // keep only the first dot
+
+		if (!cleaned || cleaned === "+" || cleaned === "-" || cleaned === "." || cleaned === "+." || cleaned === "-.") {
+			return null;
+		}
+
+		const parsed = Number(cleaned);
+		if (Number.isFinite(parsed)) return Math.trunc(parsed);
+	}
+
 	return null;
 }
 

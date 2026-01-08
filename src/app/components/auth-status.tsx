@@ -25,22 +25,13 @@ export default function AuthStatus() {
 
 	if (status !== "authenticated") {
 		return (
-			<div className="flex flex-col gap-3">
-				{showActivationNotice ? (
-					<div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-						Check your email for the activation link to finish sign-up.
-					</div>
-				) : null}
-				<div className="flex flex-wrap items-center gap-2">
-					<GoogleSignInButton />
-					<AppleSignInButton />
+			<div className="">
 					<Link
 						href="/auth/signin"
-						className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+						className="inline-flex w-full items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-1)] transition hover:bg-[color:var(--cell-2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35"
 					>
-						Email sign-in
+						Sign-in
 					</Link>
-				</div>
 			</div>
 		);
 	}
@@ -90,7 +81,7 @@ export default function AuthStatus() {
 						d="M24 48c5.7 0 10.7-1.9 14.3-5.3l-6.5-5c-1.8 1.2-4.2 2-7.8 2-6.4 0-11.9-3.6-14.1-9.4l-7.5 5.8C6.5 42.7 14.6 48 24 48z"
 					/>
 				</svg>
-				Sign out Google
+				Sign out
 			</button>
 		</div>
 	);

@@ -8,7 +8,7 @@ export { DOShardedTagCache } from "./.open-next/.build/durable-objects/sharded-t
 export { BucketCachePurge } from "./.open-next/.build/durable-objects/bucket-cache-purge.js";
 
 const CHECK_BATCH_URL = "https://internal/api/check_batch";
-const CREATE_BATCH_URL = "https://internal/api/create_batch";
+const CREATE_BATCH_URL = "https://internal/api/create_batch?limit=1";
 const NEXT_BASE_PATH = globalThis.__NEXT_BASE_PATH__ || "";
 const NEXT_TRAILING_SLASH = Boolean(globalThis.__TRAILING_SLASH__);
 
@@ -56,7 +56,7 @@ export default {
 				console.error(`Cron ${label} failed`, error);
 			});
 
-		if (!cron || cron === "*/3 * * * *") {
+		if (!cron || cron === "0 0 * * *") {
 			jobs.push(scheduleCall(CREATE_BATCH_URL, "create_batch"));
 		}
 		if (!cron || cron === "*/10 * * * *") {
