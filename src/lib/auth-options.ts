@@ -172,14 +172,6 @@ export const authOptions: NextAuthOptions = {
 					throw new Error("Activation required. Check your email for the activation link.");
 				}
 
-				if (intent === "register") {
-					const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
-					if (!captcha || captcha.toLowerCase() !== expected) {
-						throw new Error("captcha failed");
-					}
-					throw new Error("already registered");
-				}
-
 				const pwdRow = await db
 					.prepare("SELECT password_hash, salt FROM user_passwords WHERE user_pk = ? LIMIT 1")
 					.bind(userRow.user_pk)
@@ -187,6 +179,27 @@ export const authOptions: NextAuthOptions = {
 
 				if (!pwdRow) return null;
 				if (!verifyPassword(password, pwdRow.salt, pwdRow.password_hash)) return null;
+
+				if (intent === "register") {
+					const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
+					if (!captcha || captcha.toLowerCase() !== expected) {
+						throw new Error("captcha failed");
+					}
+
+					if (userRow.status !== "active") {
+						const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);
+						if (tokenResult.created) {
+							try {
+								await sendActivationEmail({ to: email, token: tokenResult.token });
+							} catch (err) {
+								console.error("Activation email send failed:", err);
+							}
+						}
+						throw new Error("Activation required. Check your email for the activation link.");
+					}
+
+					throw new Error("already registered");
+				}
 
 				if (userRow.status !== "active") {
 					const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);

@@ -38,6 +38,10 @@ function SignInPageContent() {
 
 	const [formError, setFormError] = useState<string | null>(null);
 	const [activationNotice, setActivationNotice] = useState<boolean>(false);
+	const [emailInput, setEmailInput] = useState("");
+	const [passwordInput, setPasswordInput] = useState("");
+	const [resendMessage, setResendMessage] = useState<string | null>(null);
+	const [resendLoading, setResendLoading] = useState(false);
 
 	const [showForgot, setShowForgot] = useState(false);
 	const [forgotEmail, setForgotEmail] = useState("");
@@ -77,8 +81,8 @@ function SignInPageContent() {
 		setLoading(true);
 
 		const form = e.currentTarget;
-		const email = (form.elements.namedItem("email") as HTMLInputElement | null)?.value || "";
-		const password = (form.elements.namedItem("password") as HTMLInputElement | null)?.value || "";
+		const email = emailInput || (form.elements.namedItem("email") as HTMLInputElement | null)?.value || "";
+		const password = passwordInput || (form.elements.namedItem("password") as HTMLInputElement | null)?.value || "";
 		const captcha = (form.elements.namedItem("captcha") as HTMLInputElement | null)?.value || "";
 
 		try {
@@ -144,7 +148,46 @@ function SignInPageContent() {
 
 					{noticeText ? (
 						<Callout title="Activation required" tone="notice">
-							{noticeText}
+							<div className="space-y-2">
+								<div>{noticeText}</div>
+								<div className="flex flex-wrap items-center gap-2 text-[12px] text-[color:var(--txt-2)]">
+									<button
+										type="button"
+										disabled={resendLoading}
+										onClick={async () => {
+											if (!emailInput) {
+												setFormError("Enter your email above before resending.");
+												return;
+											}
+											setResendMessage(null);
+											setFormError(null);
+											setResendLoading(true);
+											try {
+												const res = await fetch("/api/auth/resend-activation", {
+													method: "POST",
+													headers: { "Content-Type": "application/json" },
+													body: JSON.stringify({ email: emailInput }),
+												});
+												const data = (await res.json()) as { ok?: boolean; message?: string } | null;
+												if (res.ok && data?.ok) {
+													setResendMessage(data.message || "Activation email sent.");
+												} else {
+													setFormError(data?.message || "Resend failed");
+												}
+											} catch (err) {
+												setFormError(String(err));
+											} finally {
+												setResendLoading(false);
+											}
+										}}
+										className="inline-flex items-center gap-1 rounded-full border border-[color:var(--accent-1)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-1)] transition hover:-translate-y-0.5 hover:shadow-sm disabled:opacity-70"
+									>
+										{resendLoading ? "Sending…" : "Resend activation"}
+									</button>
+									{resendMessage ? <span className="text-emerald-700">{resendMessage}</span> : null}
+								</div>
+								<p className="text-[11px] text-[color:var(--txt-3)]">You can resend once every 30 minutes.</p>
+							</div>
 						</Callout>
 					) : null}
 
@@ -216,15 +259,17 @@ function SignInPageContent() {
 						<form className="space-y-4" onSubmit={handleSubmit}>
 							<Field label="Email">
 								<input
-									type="email"
-									name="email"
-									required
-									autoComplete="email"
-									className={[
-										"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
-										"bg-[color:var(--cell-1)] px-4 py-3",
-										"text-sm text-[color:var(--txt-1)] outline-none",
-										"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
+								type="email"
+								name="email"
+								required
+								autoComplete="email"
+								value={emailInput}
+								onChange={(e) => setEmailInput(e.target.value)}
+								className={[
+									"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
+									"bg-[color:var(--cell-1)] px-4 py-3",
+									"text-sm text-[color:var(--txt-1)] outline-none",
+									"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
 									].join(" ")}
 									placeholder="you@example.com"
 									disabled={loading}
@@ -233,15 +278,17 @@ function SignInPageContent() {
 
 							<Field label="Password">
 								<input
-									type="password"
-									name="password"
-									required
-									autoComplete={mode === "signin" ? "current-password" : "new-password"}
-									className={[
-										"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
-										"bg-[color:var(--cell-1)] px-4 py-3",
-										"text-sm text-[color:var(--txt-1)] outline-none",
-										"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
+								type="password"
+								name="password"
+								required
+								autoComplete={mode === "signin" ? "current-password" : "new-password"}
+								value={passwordInput}
+								onChange={(e) => setPasswordInput(e.target.value)}
+								className={[
+									"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
+									"bg-[color:var(--cell-1)] px-4 py-3",
+									"text-sm text-[color:var(--txt-1)] outline-none",
+									"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
 									].join(" ")}
 									placeholder={mode === "signin" ? "Your password" : "Create a password"}
 									disabled={loading}
