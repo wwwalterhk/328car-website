@@ -353,6 +353,7 @@ CREATE TABLE IF NOT EXISTS users (
   locale TEXT DEFAULT 'zh-hk',
   role TEXT DEFAULT 'user', -- user, dealer, admin
   status TEXT DEFAULT 'active', -- active, disabled
+  last_login_from TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -87,6 +87,7 @@ export default function ModelMergeAdminPage() {
 	} | null>(null);
 	const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 	const [autoModal, setAutoModal] = useState<{ items: Array<{ model_pk: number; model_name: string | null; group_pk: number; group_name: string; keyword: string }> } | null>(null);
+	const [autoSelected, setAutoSelected] = useState<Set<string>>(new Set());
 	const [mergeModal, setMergeModal] = useState<{
 		target: ModelRow;
 		merges: Array<{ model: ModelRow; listingIds: Array<string | number> }>;
@@ -191,6 +192,16 @@ export default function ModelMergeAdminPage() {
 			})
 			.catch(() => setGroupOptions([]));
 	}, [selectedBrand]);
+
+	useEffect(() => {
+		if (!autoModal) {
+			setAutoSelected(new Set());
+			return;
+		}
+		const next = new Set<string>();
+		autoModal.items.forEach((item) => next.add(`${item.model_pk}-${item.group_pk}`));
+		setAutoSelected(next);
+	}, [autoModal]);
 
 	const brandOptions = useMemo(
 		() =>
@@ -1356,6 +1367,7 @@ export default function ModelMergeAdminPage() {
 							<table className="min-w-full border-collapse text-[11px] sm:text-[12px]">
 								<thead className="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-100">
 									<tr>
+										<th className="border-b px-2 py-1 text-left">Use?</th>
 										<th className="border-b px-2 py-1 text-left">Model</th>
 										<th className="border-b px-2 py-1 text-left">Group</th>
 										<th className="border-b px-2 py-1 text-left">Keyword</th>
@@ -1364,6 +1376,24 @@ export default function ModelMergeAdminPage() {
 								<tbody>
 									{autoModal.items.map((item) => (
 										<tr key={`${item.model_pk}-${item.group_pk}`} className="border-b last:border-b-0">
+											<td className="px-2 py-1">
+												<input
+													type="checkbox"
+													checked={autoSelected.has(`${item.model_pk}-${item.group_pk}`)}
+													onChange={(e) => {
+														setAutoSelected((prev) => {
+															const next = new Set(prev);
+															const key = `${item.model_pk}-${item.group_pk}`;
+															if (e.target.checked) {
+																next.add(key);
+															} else {
+																next.delete(key);
+															}
+															return next;
+														});
+													}}
+												/>
+											</td>
 											<td className="px-2 py-1 text-slate-800 dark:text-slate-100">{item.model_name || "—"}</td>
 											<td className="px-2 py-1 text-slate-700 dark:text-slate-200">{item.group_name}</td>
 											<td className="px-2 py-1 text-slate-500 dark:text-slate-300">{item.keyword}</td>
@@ -1385,8 +1415,16 @@ export default function ModelMergeAdminPage() {
 								className="rounded-lg border border-[color:var(--accent-2)] bg-[color:var(--accent-2)] px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
 								onClick={async () => {
 									if (!autoModal) return;
+									const selectedItems = autoModal.items.filter((item) =>
+										autoSelected.has(`${item.model_pk}-${item.group_pk}`)
+									);
+									if (selectedItems.length === 0) {
+										setMessage("No suggestions selected.");
+										setAutoModal(null);
+										return;
+									}
 									const grouped = new Map<number, number[]>();
-									autoModal.items.forEach((item) => {
+									selectedItems.forEach((item) => {
 										const list = grouped.get(item.group_pk) ?? [];
 										list.push(item.model_pk);
 										grouped.set(item.group_pk, list);
@@ -1401,7 +1439,7 @@ export default function ModelMergeAdminPage() {
 										}
 										setModels((prev) =>
 											prev.map((m) => {
-												const hit = autoModal.items.find((i) => i.model_pk === m.model_pk);
+												const hit = selectedItems.find((i) => i.model_pk === m.model_pk);
 												if (hit) return { ...m, group_name: hit.group_name };
 												return m;
 											})

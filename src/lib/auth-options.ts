@@ -30,15 +30,16 @@ async function persistOauthUser(user: User, account: Account | null, profile?: P
 
 	await db
 		.prepare(
-			`INSERT INTO users (email, name, avatar_url, locale)
-       VALUES (?, ?, ?, ?)
+			`INSERT INTO users (email, name, avatar_url, locale, last_login_from)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(email) DO UPDATE SET
          name = COALESCE(excluded.name, users.name),
          avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
          locale = COALESCE(excluded.locale, users.locale),
+         last_login_from = ?,
          updated_at = datetime('now')`
 		)
-		.bind(email, name, avatarUrl, locale)
+		.bind(email, name, avatarUrl, locale, account.provider, account.provider)
 		.run();
 
 	const existing = await db
@@ -68,6 +69,8 @@ async function persistOauthUser(user: User, account: Account | null, profile?: P
 			typeof account.expires_at === "number" ? account.expires_at : null
 		)
 		.run();
+
+	await updateLastLogin(db, existing.user_pk, account.provider);
 }
 
 function readString(value: unknown): string | null {
@@ -182,8 +185,8 @@ export const authOptions: NextAuthOptions = {
 					.bind(userRow.user_pk)
 					.first<{ password_hash: string; salt: string }>();
 
-			if (!pwdRow) return null;
-			if (!verifyPassword(password, pwdRow.salt, pwdRow.password_hash)) return null;
+				if (!pwdRow) return null;
+				if (!verifyPassword(password, pwdRow.salt, pwdRow.password_hash)) return null;
 
 				if (userRow.status !== "active") {
 					const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);
@@ -197,10 +200,12 @@ export const authOptions: NextAuthOptions = {
 					throw new Error("Activation required. Check your email for the activation link.");
 				}
 
-			return {
-				id: String(userRow.user_pk),
-				email: userRow.email,
-				name: userRow.name ?? undefined,
+				await updateLastLogin(db, userRow.user_pk, "web");
+
+				return {
+					id: String(userRow.user_pk),
+					email: userRow.email,
+					name: userRow.name ?? undefined,
 					image: userRow.avatar_url ?? undefined,
 				};
 			},
@@ -334,4 +339,11 @@ async function getOrCreateVerificationToken(
 		.run();
 
 	return { token, created: true };
+}
+
+async function updateLastLogin(db: D1Database, userPk: number, source: string) {
+	await db
+		.prepare("UPDATE users SET last_login_from = ?, updated_at = datetime('now') WHERE user_pk = ?")
+		.bind(source, userPk)
+		.run();
 }

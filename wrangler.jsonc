@@ -53,7 +53,8 @@
 		"NEXTAUTH_URL": "https://328car.com",
 		"OPENAI_BASE_URL": "https://api.openai.com/v1",
 		"OPENAI_BATCH_MODEL": "gpt-5.2",
-		"RESEND_FROM_EMAIL": "admin@328car.com"
+		"RESEND_FROM_EMAIL": "admin@328car.com",
+		"GOOGLE_CLIENT_ID_IOS": "1013944364412-hjrnf53jh2ngq2bp3g0lru6cuk4enpol.apps.googleusercontent.com"
 	},
 	"routes": [
 		{
