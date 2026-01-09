@@ -309,30 +309,6 @@ function SoftButton({
 	);
 }
 
-function PrimaryButton({
-	href,
-	children,
-}: {
-	href: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<Link
-			href={href}
-			className={[
-				"inline-flex items-center justify-center gap-2",
-				"rounded-full",
-				"bg-[color:var(--accent-1)] px-5 py-3",
-				"text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--on-accent-1)]",
-				"transition hover:opacity-90",
-				"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
-			].join(" ")}
-		>
-			{children}
-		</Link>
-	);
-}
-
 export default async function Home() {
 	const [electricModels, traditionalModels, classicModels, brands] = await Promise.all([
 		loadElectricModelsSummary(),
@@ -344,7 +320,6 @@ export default async function Home() {
 	const electricTop = electricModels.slice(0, 12);
 	const traditionalTop = traditionalModels.slice(0, 12);
 	const classicTop = classicModels.slice(0, 12);
-	const totalModels = electricTop.length + traditionalTop.length + classicTop.length;
 
 	return (
 		<main className="relative min-h-screen text-[color:var(--txt-1)]">
@@ -358,8 +333,8 @@ export default async function Home() {
 
 			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
 				<div className="mb-6 flex items-center justify-end gap-3 text-xs sm:text-sm">
-					<a
-						href="/sell"
+					<Link
+						href="/hk/zh/sell"
 						className={[
 							"inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)]",
 							"bg-[color:var(--cell-1)] px-4 py-2 font-semibold uppercase tracking-[0.18em]",
@@ -368,7 +343,7 @@ export default async function Home() {
 						].join(" ")}
 					>
 						Sell your car
-					</a>
+					</Link>
 					<div className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-1.5">
 						<AuthStatus />
 					</div>
