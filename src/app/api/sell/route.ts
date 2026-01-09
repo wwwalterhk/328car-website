@@ -151,6 +151,11 @@ export async function POST(req: Request) {
 		return NextResponse.json({ ok: false, message: "Invalid brand." }, { status: 400 });
 	}
 
+	const brandRow = await db
+		.prepare("SELECT name_en, name_zh_hk FROM brands WHERE slug = ? LIMIT 1")
+		.bind(brandSlug)
+		.first<{ name_en: string | null; name_zh_hk: string | null }>();
+
 	if (body.power === "Electric") {
 		if (!body.power_kw || typeof body.power_kw !== "number" || body.power_kw <= 0 || !Number.isFinite(body.power_kw)) {
 			return NextResponse.json({ ok: false, message: "Output (kW) is required for electric vehicles." }, { status: 400 });
@@ -166,8 +171,8 @@ export async function POST(req: Request) {
 	let id = generateId(8);
 	const now = new Date().toISOString();
 
-	const brandZh = body.brand || "";
-	const brandEn = body.brand || "";
+	const brandZh = brandRow?.name_zh_hk || body.brand || "";
+	const brandEn = brandRow?.name_en || body.brand || "";
 	const model = body.model || "";
 	const manuYear = body.year ?? "";
 
@@ -214,7 +219,7 @@ export async function POST(req: Request) {
 	if (listingPk) {
 		id = `S${String(listingPk).padStart(7, "0")}`;
 		const priceText = formatPriceTitle(body.price);
-		const newTitle = `${id} - ${brandZh} ${brandEn} ${model} ${manuYear} HKD$${priceText}`.trim();
+		const newTitle = `${id} - ${brandZh} ${brandEn} ${model} ${manuYear} $${priceText}`.trim();
 		await db
 			.prepare("UPDATE car_listings SET id = ?, url = ?, title = ? WHERE listing_pk = ?")
 			.bind(id, `https://328car.com/sell/${id}`, newTitle, listingPk)
