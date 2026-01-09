@@ -137,10 +137,11 @@ export const authOptions: NextAuthOptions = {
 						}
 					}
 					const { hash, salt } = hashPassword(password);
+					const userId = await generateUserId(db, email);
 					try {
 						await db
-							.prepare("INSERT INTO users (email, name, avatar_url, status) VALUES (?, ?, ?, ?)")
-							.bind(email, null, null, "pending")
+							.prepare("INSERT INTO users (email, user_id, name, avatar_url, status) VALUES (?, ?, ?, ?, ?)")
+							.bind(email, userId, null, null, "pending")
 							.run();
 					} catch (error) {
 						console.error("User insert failed:", error);
@@ -281,6 +282,25 @@ function hashPassword(password: string, salt?: string): { hash: string; salt: st
 	const usedSalt = salt || randomBytes(16).toString("hex");
 	const hash = scryptSync(password, usedSalt, 64).toString("hex");
 	return { hash, salt: usedSalt };
+}
+
+async function generateUserId(db: D1Database, email: string): Promise<string> {
+	const localPart = (email.split("@")[0] || "user").toLowerCase();
+	const base = localPart.replace(/[^a-z0-9_-]/g, "") || "user";
+	let candidate = base;
+	let suffix = 0;
+	// Try base, then base1, base2, ...
+	// Limit to reasonable attempts to avoid infinite loops
+	for (let i = 0; i < 500; i++) {
+		const exists = await db
+			.prepare("SELECT 1 FROM users WHERE user_id = ? LIMIT 1")
+			.bind(candidate)
+			.first<{ 1: number }>();
+		if (!exists) return candidate;
+		suffix += 1;
+		candidate = `${base}${suffix}`;
+	}
+	throw new Error("Could not generate unique user_id");
 }
 
 function verifyPassword(password: string, salt: string, hash: string): boolean {
