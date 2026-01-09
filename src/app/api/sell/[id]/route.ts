@@ -6,6 +6,16 @@ import type { PhotoRecord } from "./types";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database; R2?: R2Bucket };
 
+function formatPriceTitle(price?: number | null): string {
+	if (price === null || price === undefined || !Number.isFinite(price)) return "";
+	if (price >= 10000) {
+		const wan = price / 10000;
+		const text = wan % 1 === 0 ? wan.toFixed(0) : wan.toFixed(1).replace(/\.0$/, "");
+		return `${text}萬`;
+	}
+	return new Intl.NumberFormat("en-US").format(Math.round(price));
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function GET(_: Request, context: any) {
 	const { params } = context || { params: { id: "" } };
@@ -122,6 +132,8 @@ export async function PUT(req: Request, context: any) {
 	}
 
 	const now = new Date().toISOString();
+	const priceText = formatPriceTitle(body.price);
+	const title = `${params.id} - ${body.brand ?? ""} ${body.model ?? ""} ${body.year ?? ""} HKD$${priceText}`.trim();
 
 	await db
 		.prepare(
@@ -132,7 +144,7 @@ export async function PUT(req: Request, context: any) {
        WHERE site = '328car' AND id = ? AND user_pk = ?`
 		)
 		.bind(
-			body.title ?? null,
+			title,
 			body.price ?? null,
 			body.year ?? null,
 			body.mileage_km ?? null,

@@ -2,6 +2,7 @@
 
 import type { ChangeEvent, FormEvent, MouseEvent } from "react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import SlotUploader, { type ImageSlot } from "./SlotUploader";
 import type { PhotoRecord } from "@/app/api/sell/[id]/types";
@@ -65,6 +66,7 @@ export default function SellForm(props?: SellProps) {
 	const [brands, setBrands] = useState<Array<{ slug: string; name: string }>>([]);
 	const { status } = useSession();
 	const isAuthed = status === "authenticated";
+	const router = useRouter();
 
 	useEffect(() => {
 		const fetchBrands = async () => {
@@ -215,6 +217,7 @@ export default function SellForm(props?: SellProps) {
 				setMessage(editId ? "Listing updated." : `Submitted. Your listing id: ${data.id}`);
 				if (editId && onUpdated) onUpdated();
 				if (!editId) setForm(initialState);
+				router.push("/hk/zh/profile");
 			} else {
 				setError(data?.message || "Submit failed");
 			}
@@ -385,14 +388,36 @@ export default function SellForm(props?: SellProps) {
 								className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
 								required
 							>
-								<option value="Sedan">Sedan</option>
-								<option value="SUV">SUV</option>
-								<option value="Hatchback">Hatchback</option>
-								<option value="Coupe">Coupe</option>
-								<option value="Convertible">Convertible</option>
-								<option value="Wagon">Wagon</option>
-								<option value="MPV">MPV</option>
-								<option value="Pickup">Pickup</option>
+								{form.vehicle_type === "commercial" ? (
+									<>
+										<option value="Van">Van</option>
+										<option value="Truck">Truck</option>
+										<option value="Lorry">Lorry</option>
+										<option value="Minibus">Minibus</option>
+										<option value="Other">Other</option>
+									</>
+								) : form.vehicle_type === "motorcycle" ? (
+									<>
+										<option value="Scooter">Scooter</option>
+										<option value="Sport">Sport</option>
+										<option value="Touring">Touring</option>
+										<option value="Cruiser">Cruiser</option>
+										<option value="Dual-sport">Dual-sport</option>
+										<option value="Other">Other</option>
+									</>
+								) : (
+									<>
+										<option value="Sedan">Sedan</option>
+										<option value="SUV">SUV</option>
+										<option value="Hatchback">Hatchback</option>
+										<option value="Coupe">Coupe</option>
+										<option value="Convertible">Convertible</option>
+										<option value="Wagon">Wagon</option>
+										<option value="MPV">MPV</option>
+										<option value="Pickup">Pickup</option>
+										<option value="Other">Other</option>
+									</>
+								)}
 							</select>
 						</label>
 					</div>

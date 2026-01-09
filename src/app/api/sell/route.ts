@@ -26,6 +26,16 @@ function slugify(value: string | undefined | null): string | null {
 	return slug || null;
 }
 
+function formatPriceTitle(price?: number | null): string {
+	if (price === null || price === undefined || !Number.isFinite(price)) return "";
+	if (price >= 10000) {
+		const wan = price / 10000;
+		const text = wan % 1 === 0 ? wan.toFixed(0) : wan.toFixed(1).replace(/\.0$/, "");
+		return `${text}萬`;
+	}
+	return new Intl.NumberFormat("en-US").format(Math.round(price));
+}
+
 export async function POST(req: Request) {
 	const { env } = await getCloudflareContext({ async: true });
 	const db = (env as DbBindings).DB;
@@ -154,17 +164,12 @@ export async function POST(req: Request) {
 	}
 
 	let id = generateId(8);
-	// Retry once on collision
-	for (let i = 0; i < 2; i++) {
-		const clash = await db
-			.prepare("SELECT 1 FROM car_listings WHERE site = '328car' AND id = ? LIMIT 1")
-			.bind(id)
-			.first();
-		if (!clash) break;
-		id = generateId(8);
-	}
-
 	const now = new Date().toISOString();
+
+	const brandZh = body.brand || "";
+	const brandEn = body.brand || "";
+	const model = body.model || "";
+	const manuYear = body.year ?? "";
 
 	const insertRes = await db
 		.prepare(
@@ -178,7 +183,7 @@ export async function POST(req: Request) {
 		.bind(
 			id,
 			`https://328car.com/sell/${id}`,
-			body.title ?? null,
+			null,
 			body.price ?? null,
 			body.year ?? null,
 			body.mileage_km ?? null,
@@ -203,11 +208,18 @@ export async function POST(req: Request) {
 			now
 		)
 		.run();
-	const listingPkRow = await db
-		.prepare("SELECT listing_pk FROM car_listings WHERE site = '328car' AND id = ? LIMIT 1")
-		.bind(id)
-		.first<{ listing_pk: number }>();
-	const listingPk = listingPkRow?.listing_pk ?? insertRes.meta?.last_row_id ?? null;
+	const listingPk = insertRes.meta?.last_row_id ?? null;
+
+	// Normalize ID to S + zero-padded listing_pk
+	if (listingPk) {
+		id = `S${String(listingPk).padStart(7, "0")}`;
+		const priceText = formatPriceTitle(body.price);
+		const newTitle = `${id} - ${brandZh} ${brandEn} ${model} ${manuYear} HKD$${priceText}`.trim();
+		await db
+			.prepare("UPDATE car_listings SET id = ?, url = ?, title = ? WHERE listing_pk = ?")
+			.bind(id, `https://328car.com/sell/${id}`, newTitle, listingPk)
+			.run();
+	}
 
 	// Save images to R2 if provided
 	const photos: string[] = [];

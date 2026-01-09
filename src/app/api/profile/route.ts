@@ -31,11 +31,11 @@ export async function GET() {
 
 	const listings = await db
 		.prepare(
-			`SELECT listing_pk, id, title, price, year, mileage_km, sts, created_at, photos, vehicle_type, body_type
+			`SELECT listing_pk, id, title, price, year, mileage_km, sts, created_at, photos, vehicle_type, body_type, brand, model
        FROM car_listings WHERE user_pk = ? ORDER BY created_at DESC`
 		)
 		.bind(user.user_pk)
-		.all<{ listing_pk: number; id: string; title: string | null; price: number | null; year: number | null; mileage_km: number | null; sts: number | null; created_at: string | null; photos: string | null; vehicle_type: string | null; body_type: string | null }>();
+		.all<{ listing_pk: number; id: string; title: string | null; price: number | null; year: number | null; mileage_km: number | null; sts: number | null; created_at: string | null; photos: string | null; vehicle_type: string | null; body_type: string | null; brand: string | null; model: string | null }>();
 
 	const listingsWithPhotos = [];
 	for (const l of listings.results || []) {

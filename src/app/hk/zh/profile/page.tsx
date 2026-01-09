@@ -125,9 +125,9 @@ export default function ProfilePage() {
 				<div>
 					<div className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--txt-3)]">Profile</div>
 					<h1 className="text-3xl font-semibold">Your account</h1>
-					<p className="text-sm text-[color:var(--txt-3)]">
-						Edit your name and avatar. Listings below belong to this account. User ID: {profile?.user?.user_id || "—"}
-					</p>
+					{profile?.user?.user_id ? (
+						<p className="mt-1 text-sm text-[color:var(--txt-3)]">Handle: @{profile.user.user_id}</p>
+					) : null}
 				</div>
 
 				<div className="space-y-4 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-6 shadow-sm">
@@ -171,9 +171,7 @@ export default function ProfilePage() {
 							placeholder="Your name"
 						/>
 					</label>
-					<div className="text-[11px] text-[color:var(--txt-3)]">
-						Click the avatar to select a file, or drag & drop a photo. We’ll resize to 200px square and upload to /avatar in CDN.
-					</div>
+				
 					<div className="flex items-center gap-3">
 						<button
 							type="button"
