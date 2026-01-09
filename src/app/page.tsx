@@ -357,6 +357,23 @@ export default async function Home() {
 			/>
 
 			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
+				<div className="mb-6 flex items-center justify-end gap-3 text-xs sm:text-sm">
+					<a
+						href="/sell"
+						className={[
+							"inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)]",
+							"bg-[color:var(--cell-1)] px-4 py-2 font-semibold uppercase tracking-[0.18em]",
+							"text-[color:var(--txt-2)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]",
+							"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/30",
+						].join(" ")}
+					>
+						Sell your car
+					</a>
+					<div className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-1.5">
+						<AuthStatus />
+					</div>
+				</div>
+
 				{/* HERO (AI search + member access) */}
 				<section className="space-y-6">
 					{/* Row 1: AI Search (full width) */}
