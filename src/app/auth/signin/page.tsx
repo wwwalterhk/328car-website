@@ -321,25 +321,6 @@ function SignInPageContent() {
 							{mode === "register" ? (
 								<div className="space-y-3">
 									<TurnstileWidget onToken={setTurnstileToken} />
-									<Field label="Security code (fallback)">
-										<input
-											type="text"
-											name="captcha"
-											className={[
-												"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
-												"bg-[color:var(--cell-1)] px-4 py-3",
-												"text-sm text-[color:var(--txt-1)] outline-none",
-												"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
-											].join(" ")}
-											placeholder="Type 328car (used if Turnstile is unavailable)"
-											disabled={loading}
-											autoComplete="off"
-											spellCheck={false}
-										/>
-									</Field>
-									<p className="text-[11px] text-[color:var(--txt-3)]">
-										Turnstile will be used when available; otherwise the text code is required.
-									</p>
 								</div>
 							) : null}
 
@@ -591,7 +572,6 @@ function TurnstileWidget({ onToken }: { onToken: (token: string | null) => void 
 			<div className="mt-3 flex justify-center">
 				<div ref={widgetRef} />
 			</div>
-			<p className="mt-2 text-[11px] text-[color:var(--txt-3)]">Protected by Turnstile.</p>
 		</div>
 	);
 }

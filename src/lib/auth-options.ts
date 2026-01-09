@@ -135,97 +135,83 @@ export const authOptions: NextAuthOptions = {
 					.bind(email)
 					.first<{ user_pk: number; email: string; name: string | null; avatar_url: string | null; status: string }>();
 
-				if (!userRow) {
-					if (intent === "register") {
-						if (TURNSTILE_SECRET_KEY) {
-							const ok = await verifyTurnstile(turnstileToken);
-							if (!ok) {
-								console.warn("register captcha failed (turnstile)", { email, turnstileToken });
-								throw new Error("captcha failed");
-							}
-						} else {
-							const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
-							if (!captcha || captcha.toLowerCase() !== expected) {
-								console.warn("register captcha failed", { email, captcha });
-								throw new Error("captcha failed");
-							}
+				// Registration path
+				if (intent === "register") {
+					if (TURNSTILE_SECRET_KEY) {
+						const ok = await verifyTurnstile(turnstileToken);
+						if (!ok) {
+							console.warn("register captcha failed (turnstile)", { email, turnstileToken });
+							throw new Error("captcha failed");
+						}
+					} else {
+						const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
+						const cap = captcha ?? "";
+						if (!cap || cap.toLowerCase() !== expected) {
+							console.warn("register captcha failed", { email, captcha });
+							throw new Error("captcha failed");
 						}
 					}
-					const { hash, salt } = hashPassword(password);
-					const userId = await generateUserId(db, email);
-					try {
-						await db
-							.prepare("INSERT INTO users (email, user_id, name, avatar_url, status) VALUES (?, ?, ?, ?, ?)")
-							.bind(email, userId, userId, null, "pending")
-							.run();
-					} catch (error) {
-						console.error("User insert failed:", error);
-						// Unique constraint hit while registering
+
+					if (userRow?.user_pk) {
+						if (userRow.status !== "active") {
+							const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);
+							if (tokenResult.created) {
+								try {
+									await sendActivationEmail({ to: email || "", token: tokenResult.token });
+								} catch (err) {
+									console.error("Activation email send failed:", err);
+								}
+							}
+							throw new Error("Activation required. Check your email for the activation link.");
+						}
 						throw new Error("already registered");
 					}
-					const newUser = await db
-						.prepare("SELECT user_pk, email FROM users WHERE email = ? LIMIT 1")
-						.bind(email)
-						.first<{ user_pk: number; email: string }>();
-					if (!newUser?.user_pk) return null;
+
+					// create new user
+					const { hash, salt } = hashPassword(password);
+					const userId = await generateUserId(db, email);
+					const insertRes = await db
+						.prepare("INSERT INTO users (email, user_id, name, avatar_url, status) VALUES (?, ?, ?, ?, ?)")
+						.bind(email, userId, userId, null, "pending")
+						.run();
+					const newPk = insertRes.meta?.last_row_id ?? null;
+					if (!newPk) return null;
+
 					await db
 						.prepare(
 							`INSERT INTO user_passwords (user_pk, password_hash, salt, created_at, updated_at)
                VALUES (?, ?, ?, datetime('now'), datetime('now'))
                ON CONFLICT(user_pk) DO UPDATE SET password_hash = excluded.password_hash, salt = excluded.salt, updated_at = excluded.updated_at`
 						)
-						.bind(newUser.user_pk, hash, salt)
+						.bind(newPk, hash, salt)
 						.run();
 
-					const tokenResult = await getOrCreateVerificationToken(db, newUser.user_pk);
+					const tokenResult = await getOrCreateVerificationToken(db, newPk);
 					if (tokenResult.created) {
 						try {
-							await sendActivationEmail({ to: email, token: tokenResult.token });
+							await sendActivationEmail({ to: email || "", token: tokenResult.token });
 						} catch (error) {
 							console.error("Activation email send failed:", error);
 						}
 					}
-					console.info("Credentials register success (pending activation)", { email, user_pk: newUser.user_pk });
+					console.info("Credentials register success (pending activation)", { email, user_pk: newPk });
 					throw new Error("Activation required. Check your email for the activation link.");
-				} else {
-					// Not found and not register intent
-					return null;
 				}
 
+				// Sign-in path
+				if (!userRow?.user_pk) return null;
 				const pwdRow = await db
 					.prepare("SELECT password_hash, salt FROM user_passwords WHERE user_pk = ? LIMIT 1")
 					.bind(userRow.user_pk)
 					.first<{ password_hash: string; salt: string }>();
-
-				if (!pwdRow) return null;
+				if (!pwdRow || !password) return null;
 				if (!verifyPassword(password, pwdRow.salt, pwdRow.password_hash)) return null;
-
-				if (intent === "register") {
-					const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
-					if (!captcha || captcha.toLowerCase() !== expected) {
-						throw new Error("captcha failed");
-					}
-
-					if (userRow.status !== "active") {
-						const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);
-						if (tokenResult.created) {
-							try {
-								await sendActivationEmail({ to: email, token: tokenResult.token });
-							} catch (err) {
-								console.error("Activation email send failed:", err);
-							}
-						}
-						throw new Error("Activation required. Check your email for the activation link.");
-					}
-
-					throw new Error("already registered");
-				}
 
 				if (userRow.status !== "active") {
 					const tokenResult = await getOrCreateVerificationToken(db, userRow.user_pk);
 					if (tokenResult.created) {
 						try {
-							await sendActivationEmail({ to: email, token: tokenResult.token });
+							await sendActivationEmail({ to: email || "", token: tokenResult.token });
 						} catch (err) {
 							console.error("Activation email send failed:", err);
 						}
