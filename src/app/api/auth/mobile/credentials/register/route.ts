@@ -35,14 +35,14 @@ export async function POST(req: Request) {
 			return NextResponse.json({ ok: false, message: "Already registered. Please sign in.", message_code: "already_registered" }, { status: 400 });
 		}
 		// pending user: resend activation
-		const tokenResult = await getOrCreateVerificationToken(db, existing.user_pk);
-		if (tokenResult.token) {
-			try {
-				await sendActivationEmail({ to: email, token: tokenResult.token });
-			} catch (err) {
-				console.error("Activation email resend failed:", err);
-			}
-		}
+		// const tokenResult = await getOrCreateVerificationToken(db, existing.user_pk);
+		// if (tokenResult.token) {
+		// 	try {
+		// 		await sendActivationEmail({ to: email, token: tokenResult.token });
+		// 	} catch (err) {
+		// 		console.error("Activation email resend failed:", err);
+		// 	}
+		// }
 		return NextResponse.json({
 			ok: true,
 			message: "Activation required. Check your email for the activation link.",
