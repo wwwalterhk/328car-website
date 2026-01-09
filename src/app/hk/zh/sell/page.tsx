@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import type { ChangeEvent, FormEvent, MouseEvent } from "react";
+import { useEffect, useState } from "react";
+import { signIn, useSession } from "next-auth/react";
+import SlotUploader, { type ImageSlot } from "./SlotUploader";
 
 type FormState = {
 	brand: string;
@@ -11,9 +14,15 @@ type FormState = {
 	body_type: string;
 	transmission: string;
 	power: string;
+	engine_cc: string;
+	power_kw: string;
+	first_registration_count: string;
+	licence_expiry: string;
 	color: string;
 	remark: string;
-	images: Array<File>;
+	vehicle_type: string;
+	seats: string;
+	images: Array<{ slot: ImageSlot; file: File; url: string }>;
 };
 
 const initialState: FormState = {
@@ -22,11 +31,17 @@ const initialState: FormState = {
 	year: "",
 	price: "",
 	mileage_km: "",
-	body_type: "",
-	transmission: "",
-	power: "",
+	body_type: "Sedan",
+	transmission: "auto",
+	power: "Petrol",
+	engine_cc: "",
+	power_kw: "",
+	first_registration_count: "",
+	licence_expiry: "",
 	color: "",
 	remark: "",
+	vehicle_type: "private",
+	seats: "5",
 	images: [],
 };
 
@@ -36,6 +51,8 @@ export default function SellCarPage() {
 	const [message, setMessage] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [brands, setBrands] = useState<Array<{ slug: string; name: string }>>([]);
+	const { status } = useSession();
+	const isAuthed = status === "authenticated";
 
 	useEffect(() => {
 		const fetchBrands = async () => {
@@ -46,7 +63,7 @@ export default function SellCarPage() {
 					setBrands(
 						data.brands.map((b) => ({
 							slug: b.slug,
-							name: b.name_zh_hk || b.name_en || b.slug,
+							name: [b.name_en, b.name_zh_hk].filter(Boolean).join(" / ") || b.slug,
 						}))
 					);
 				}
@@ -57,24 +74,73 @@ export default function SellCarPage() {
 		void fetchBrands();
 	}, []);
 
-const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-	setForm((prev) => ({ ...prev, [key]: e.target.value }));
-};
+	const handleChange = (key: keyof FormState) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+		setForm((prev) => ({ ...prev, [key]: e.target.value }));
+	};
 
-	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement>, targetSts: number) => {
 		e.preventDefault();
 		setMessage(null);
 		setError(null);
 		setLoading(true);
+		if (!isAuthed) {
+			setError("Please sign in to submit a listing.");
+			setLoading(false);
+			return;
+		}
+
+		if (form.model.trim().length < 2) {
+			setError("Model must be at least 2 characters.");
+			setLoading(false);
+			return;
+		}
+		if (form.remark.trim().length < 20) {
+			setError("Remark must be at least 20 characters.");
+			setLoading(false);
+			return;
+		}
+		if (!form.year || !form.price || !form.mileage_km || !form.body_type || !form.color) {
+			setError("All fields are required.");
+			setLoading(false);
+			return;
+		}
+		if (!form.vehicle_type) {
+			setError("Vehicle type is required.");
+			setLoading(false);
+			return;
+		}
+		if (form.vehicle_type === "private" && !form.seats) {
+			setError("Please select seats for private car.");
+			setLoading(false);
+			return;
+		}
+		if (form.power === "Electric" && !form.power_kw.trim()) {
+			setError("Please enter output (kW) for electric vehicles.");
+			setLoading(false);
+			return;
+		}
+		if (form.power !== "Electric" && !form.engine_cc.trim()) {
+			setError("Please enter engine (cc).");
+			setLoading(false);
+			return;
+		}
+
 		try {
 			const res = await fetch("/api/sell", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					...form,
+					sts: targetSts,
 					year: form.year ? Number(form.year) : null,
 					price: form.price ? Number(form.price) : null,
 					mileage_km: form.mileage_km ? Number(form.mileage_km) : null,
+					engine_cc: form.power === "Electric" ? null : form.engine_cc ? Number(form.engine_cc) : null,
+					power_kw: form.power === "Electric" ? (form.power_kw ? Number(form.power_kw) : null) : null,
+					vehicle_type: form.vehicle_type,
+					seats: form.vehicle_type === "private" ? Number(form.seats) : null,
+					first_registration_count: form.first_registration_count ? Number(form.first_registration_count) : null,
+					licence_expiry: form.licence_expiry || null,
 					images: await prepareImages(form.images),
 				}),
 			});
@@ -92,6 +158,16 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 		}
 	};
 
+	const addImages = (slot: ImageSlot, files: File[]) => {
+		const first = files[0];
+		if (!first) return;
+		const url = URL.createObjectURL(first);
+		setForm((prev) => {
+			const filtered = prev.images.filter((img) => img.slot !== slot);
+			return { ...prev, images: [...filtered, { slot, file: first, url }] };
+		});
+	};
+
 	return (
 		<main className="min-h-screen bg-[color:var(--bg-1)] text-[color:var(--txt-1)]">
 			<div className="mx-auto max-w-4xl px-6 py-12 sm:px-10 lg:px-16">
@@ -101,14 +177,29 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 					</div>
 					<h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Post a listing</h1>
 					<p className="text-sm text-[color:var(--txt-2)]">
-						Provide the basics below. We generate an 8-character ID and keep your listing in review (sts=2) before it goes live.
+						Provide the basics below. We generate an 8-character ID and keep your listing in review (sts=4) before it goes live.
 					</p>
 				</div>
+
+				{!isAuthed ? (
+					<div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+						<div className="font-semibold">Sign in is required to post a car.</div>
+						<div className="flex flex-wrap gap-3">
+							<button
+								type="button"
+								onClick={() => void signIn()}
+								className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-1)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--on-accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+							>
+								Sign in
+							</button>
+						</div>
+					</div>
+				) : null}
 
 				{message ? <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div> : null}
 				{error ? <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{error}</div> : null}
 
-				<form onSubmit={handleSubmit} className="space-y-6 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-6 shadow-sm">
+				<form onSubmit={(e) => void handleSubmit(e, 1)} className="space-y-6 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-6 shadow-sm">
 					<div className="grid gap-4 sm:grid-cols-2">
 						<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
 							Brand
@@ -127,29 +218,27 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 							</select>
 						</label>
 
-						<TextField label="Model" required value={form.model} onChange={handleChange("model")} />
-
-						<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
-							Transmission
-							<select
-								value={form.transmission}
-								onChange={(e) => setForm((prev) => ({ ...prev, transmission: e.target.value }))}
-								className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
-							>
-								<option value="">Select</option>
-								<option value="auto">Auto</option>
-								<option value="manual">Manual</option>
-							</select>
-						</label>
+						<TextField label="Model" required minLength={2} value={form.model} onChange={handleChange("model")} />
+						<TextField label="Year" required value={form.year} onChange={handleChange("year")} placeholder="e.g. 2018" />
+						<TextField label="Mileage (km)" required value={form.mileage_km} onChange={handleChange("mileage_km")} placeholder="e.g. 45000" />
+						<TextField label="Price" required value={form.price} onChange={handleChange("price")} placeholder="e.g. 380000" />
+						<TextField label="First registration count" value={form.first_registration_count} onChange={handleChange("first_registration_count")} placeholder="Number (optional)" />
 
 						<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
 							Power
 							<select
 								value={form.power}
-								onChange={(e) => setForm((prev) => ({ ...prev, power: e.target.value }))}
+								onChange={(e) => {
+									const nextPower = e.target.value;
+									setForm((prev) => ({
+										...prev,
+										power: nextPower,
+										transmission: nextPower === "Petrol" || nextPower === "Diesel" ? prev.transmission : "auto",
+									}));
+								}}
 								className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
+								required
 							>
-								<option value="">Select</option>
 								<option value="Petrol">Petrol</option>
 								<option value="Diesel">Diesel</option>
 								<option value="Hybrid">Hybrid</option>
@@ -158,10 +247,68 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 							</select>
 						</label>
 
-						<TextField label="Color" value={form.color} onChange={handleChange("color")} />
-						<TextField label="Year" value={form.year} onChange={handleChange("year")} placeholder="e.g. 2018" />
-						<TextField label="Mileage (km)" value={form.mileage_km} onChange={handleChange("mileage_km")} placeholder="e.g. 45000" />
-						<TextField label="Price" value={form.price} onChange={handleChange("price")} placeholder="e.g. 380000" />
+						{form.power === "Petrol" || form.power === "Diesel" ? (
+							<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
+								Transmission
+								<select
+									value={form.transmission}
+									onChange={(e) => setForm((prev) => ({ ...prev, transmission: e.target.value }))}
+									className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
+									required
+								>
+									<option value="auto">Auto</option>
+									<option value="manual">Manual</option>
+								</select>
+							</label>
+						) : (
+							<div className="hidden" aria-hidden />
+						)}
+						{form.power === "Electric" ? (
+							<TextField label="Output (kW)" required value={form.power_kw} onChange={handleChange("power_kw")} placeholder="e.g. 150" />
+						) : (
+							<TextField label="Engine (cc)" required value={form.engine_cc} onChange={handleChange("engine_cc")} placeholder="e.g. 1998" />
+						)}
+
+						<TextField label="Color" required value={form.color} onChange={handleChange("color")} />
+						<TextField label="Licence expiry" value={form.licence_expiry} onChange={handleChange("licence_expiry")} placeholder="YYYY-MM-DD (optional)" />
+
+						<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
+							Vehicle type
+							<select
+								value={form.vehicle_type}
+								onChange={(e) =>
+									setForm((prev) => ({
+										...prev,
+										vehicle_type: e.target.value,
+										seats: e.target.value === "private" ? prev.seats || "5" : "",
+									}))
+								}
+								className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
+								required
+							>
+								<option value="private">Private car</option>
+								<option value="commercial">Commercial car</option>
+								<option value="motorcycle">Motorcycle</option>
+							</select>
+						</label>
+
+						{form.vehicle_type === "private" ? (
+							<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
+								Seats
+								<select
+									value={form.seats}
+									onChange={(e) => setForm((prev) => ({ ...prev, seats: e.target.value }))}
+									className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
+									required
+								>
+									{["1", "2", "3", "4", "5", "6", "7", "8"].map((s) => (
+										<option key={s} value={s}>
+											{s}
+										</option>
+									))}
+								</select>
+							</label>
+						) : null}
 
 						<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
 							Body type
@@ -169,8 +316,8 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 								value={form.body_type}
 								onChange={(e) => setForm((prev) => ({ ...prev, body_type: e.target.value }))}
 								className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
+								required
 							>
-								<option value="">Select</option>
 								<option value="Sedan">Sedan</option>
 								<option value="SUV">SUV</option>
 								<option value="Hatchback">Hatchback</option>
@@ -183,33 +330,45 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 						</label>
 					</div>
 
-				<div>
-					<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
-						Remark
-						<textarea
-							className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
-								rows={4}
-								value={form.remark}
-								onChange={handleChange("remark")}
-								placeholder="Notes about condition, options, ownership..."
-							/>
-						</label>
+					<div>
+						<div className="space-y-4 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] p-4">
+							<div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
+								Upload photos (up to 6)
+							</div>
+							<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+								{(["front", "left", "right", "back", "interior1", "interior2"] as ImageSlot[]).map((slot) => (
+									<SlotUploader
+										key={slot}
+										slot={slot}
+										current={form.images.find((img) => img.slot === slot) || null}
+										onFiles={(files) => addImages(slot, files)}
+										onRemove={() =>
+											setForm((prev) => ({ ...prev, images: prev.images.filter((img) => img.slot !== slot) }))
+										}
+									/>
+								))}
+							</div>
+							<p className="text-[11px] text-[color:var(--txt-3)]">
+								We’ll resize to square 200px, 512px, and 1024px (JPG). Drag & drop or tap to upload.
+							</p>
+							<p className="text-[11px] text-[color:var(--txt-3)]">
+								If your photos aren&apos;t ready, choose “Save draft” and upload them later.
+							</p>
+						</div>
 					</div>
 
 					<div>
 						<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
-							Photos (up to 5)
-							<input
-								type="file"
-								accept="image/*"
-								multiple
-								onChange={(e) => {
-									const files = Array.from(e.target.files ?? []).slice(0, 5);
-									setForm((prev) => ({ ...prev, images: files }));
-								}}
-								className="mt-2 w-full text-sm text-[color:var(--txt-2)]"
+							Remark
+							<textarea
+								className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
+								rows={4}
+								value={form.remark}
+								required
+								minLength={20}
+								onChange={handleChange("remark")}
+								placeholder="Notes about condition, options, ownership..."
 							/>
-							<p className="mt-1 text-[11px] text-[color:var(--txt-3)]">We will resize to square 200px, 3/4 512px, and 3/4 1024px (JPG).</p>
 						</label>
 					</div>
 
@@ -225,13 +384,24 @@ const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputEl
 						>
 							Clear
 						</button>
-						<button
-							type="submit"
-							disabled={loading}
-							className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-1)] px-6 py-2.5 text-sm font-semibold uppercase tracking-[0.22em] text-[color:var(--on-accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
-						>
-							{loading ? "Submitting…" : "Submit listing"}
-						</button>
+						<div className="flex flex-wrap gap-3">
+							<button
+								type="button"
+								disabled={loading || !isAuthed}
+								onClick={(e) => void handleSubmit(e, 4)}
+								className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-5 py-2 text-sm font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-2)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)] disabled:cursor-not-allowed disabled:opacity-70"
+							>
+								Save draft
+							</button>
+							<button
+								type="submit"
+								disabled={loading || !isAuthed}
+								onClick={(e) => void handleSubmit(e, 1)}
+								className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent-1)] px-6 py-2.5 text-sm font-semibold uppercase tracking-[0.22em] text-[color:var(--on-accent-1)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-70"
+							>
+								{isAuthed ? (loading ? "Submitting…" : "Publish") : "Sign in required"}
+							</button>
+						</div>
 					</div>
 				</form>
 			</div>
@@ -245,12 +415,14 @@ function TextField({
 	onChange,
 	placeholder,
 	required,
+	minLength,
 }: {
 	label: string;
 	value: string;
-	onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+	onChange: (e: ChangeEvent<HTMLInputElement>) => void;
 	placeholder?: string;
 	required?: boolean;
+	minLength?: number;
 }) {
 	return (
 		<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
@@ -260,6 +432,7 @@ function TextField({
 				value={value}
 				onChange={onChange}
 				required={required}
+				minLength={minLength}
 				placeholder={placeholder}
 				className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
 			/>
@@ -267,7 +440,7 @@ function TextField({
 	);
 }
 
-async function prepareImages(files: File[]) {
+async function prepareImages(images: Array<{ file: File; url: string; slot?: ImageSlot }>) {
 	const targets = [
 		{ label: "small", width: 200, height: 200 },
 		{ label: "medium", width: Math.round((512 * 4) / 3), height: 512 },
@@ -276,7 +449,7 @@ async function prepareImages(files: File[]) {
 
 	const results: Array<{ name?: string; small?: string; medium?: string; large?: string }> = [];
 
-	for (const file of files.slice(0, 5)) {
+	for (const { file } of images.slice(0, 6)) {
 		const img = await fileToImage(file);
 		if (!img) continue;
 

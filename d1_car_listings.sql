@@ -12,8 +12,9 @@ CREATE TABLE IF NOT EXISTS car_listings (
   year INTEGER,
   mileage_km INTEGER,
   engine_cc INTEGER,
-  transmission TEXT,
-  fuel TEXT,
+  power_kw INTEGER,
+  transmission TEXT NOT NULL DEFAULT 'auto',
+  fuel TEXT NOT NULL DEFAULT 'Petrol',
   brand TEXT,
   brand_slug TEXT,
   model TEXT,
@@ -30,16 +31,19 @@ CREATE TABLE IF NOT EXISTS car_listings (
   seller_name TEXT,
   seller_phone TEXT,
   contact TEXT,
+  user_pk INTEGER,
   summary TEXT,
   remark TEXT,
   photos TEXT, -- JSON array of image URLs
   last_update_datetime TEXT,
   vehicle_type TEXT,
   sold INTEGER, -- 0/1
-  sts INTEGER DEFAULT 1, -- 0=disabled, 1=enabled, 2=pending inspection
+  sts INTEGER DEFAULT 1, -- 0=disabled, 1=enabled, 2=pending inspection, 4=post in draft
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (site, id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_car_listings_user_pk ON car_listings(user_pk);
 
 -- Brand lookup table (slug as primary key, supports English and zh_TW names)
 CREATE TABLE IF NOT EXISTS brands (
