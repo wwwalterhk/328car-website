@@ -51,7 +51,7 @@ function SignInPageContent() {
 
 	const [showForgot, setShowForgot] = useState(false);
 	const [forgotEmail, setForgotEmail] = useState("");
-	const [forgotCaptcha, setForgotCaptcha] = useState("");
+	const [forgotCaptcha, setForgotCaptcha] = useState<string | null>(null);
 	const [forgotMessage, setForgotMessage] = useState<string | null>(null);
 	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
@@ -162,7 +162,7 @@ function SignInPageContent() {
 						</p>
 					</header>
 
-					{noticeText ? (
+					{mode === "register" && noticeText ? (
 						<Callout title="Activation required" tone="notice">
 							<div className="space-y-2">
 								<div>{noticeText}</div>
@@ -347,6 +347,7 @@ function SignInPageContent() {
 						</form>
 
 						{/* Forgot password */}
+						{mode === "signin" ? (
 						<div className="mt-6">
 							<button
 								type="button"
@@ -410,22 +411,7 @@ function SignInPageContent() {
 										/>
 									</Field>
 
-									<Field label="Security check">
-										<input
-											type="text"
-											required
-											value={forgotCaptcha}
-											onChange={(e) => setForgotCaptcha(e.target.value)}
-											className={[
-												"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
-												"bg-[color:var(--cell-1)] px-4 py-3",
-												"text-sm text-[color:var(--txt-1)] outline-none",
-												"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
-											].join(" ")}
-											placeholder="Type 328car"
-											disabled={loading}
-										/>
-									</Field>
+									<TurnstileWidget onToken={setForgotCaptcha} />
 
 									<button
 										type="submit"
@@ -450,6 +436,7 @@ function SignInPageContent() {
 								</form>
 							) : null}
 						</div>
+						) : null}
 
 						{/* Legal */}
 						<div className="mt-6 border-t border-[color:var(--surface-border)] pt-5">

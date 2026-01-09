@@ -4,6 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { sendPasswordResetEmail } from "@/lib/email";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database };
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
 
 function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
 	const usedSalt = salt || randomBytes(16).toString("hex");
@@ -39,18 +40,26 @@ export async function POST(req: Request) {
 	const db = (env as DbBindings).DB;
 	if (!db) return NextResponse.json({ ok: false, message: "DB unavailable" }, { status: 500 });
 
-	const body = (await req.json().catch(() => null)) as { email?: unknown; captcha?: unknown; token?: unknown; password?: unknown } | null;
+	const body = (await req.json().catch(() => null)) as {
+		email?: unknown;
+		token?: unknown;
+		password?: unknown;
+		turnstile_token?: unknown;
+	} | null;
 	const email = typeof body?.email === "string" ? body.email.toLowerCase().trim() : "";
-	const captcha = typeof body?.captcha === "string" ? body.captcha.trim().toLowerCase() : "";
 	const token = typeof body?.token === "string" ? body.token : "";
 	const password = typeof body?.password === "string" ? body.password : "";
-	const expectedCaptcha = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
+	const turnstileToken = typeof body?.turnstile_token === "string" ? body.turnstile_token : "";
 
 	if (!email) return NextResponse.json({ ok: false, message: "Email required" }, { status: 400 });
 
 	// Request reset email
 	if (!token && !password) {
-		if (captcha !== expectedCaptcha) {
+		if (!TURNSTILE_SECRET_KEY) {
+			return NextResponse.json({ ok: false, message: "captcha unavailable" }, { status: 500 });
+		}
+		const ok = await verifyTurnstile(turnstileToken);
+		if (!ok) {
 			return NextResponse.json({ ok: false, message: "captcha failed" }, { status: 400 });
 		}
 
@@ -127,4 +136,24 @@ export async function POST(req: Request) {
 	await db.prepare("DELETE FROM password_reset_tokens WHERE user_pk = ?").bind(user.user_pk).run();
 
 	return NextResponse.json({ ok: true, message: "Password updated" });
+}
+
+async function verifyTurnstile(token: string): Promise<boolean> {
+	if (!TURNSTILE_SECRET_KEY) return false;
+	if (!token) return false;
+	try {
+		const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				secret: TURNSTILE_SECRET_KEY,
+				response: token,
+			}),
+		});
+		const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
+		return !!data?.success;
+	} catch (err) {
+		console.error("Turnstile verify failed", err);
+		return false;
+	}
 }

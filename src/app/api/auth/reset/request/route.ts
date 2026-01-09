@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { sendPasswordResetEmail } from "@/lib/email";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database };
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
 
 async function ensureResetTable(db: D1Database) {
 	await db
@@ -26,16 +27,23 @@ export async function POST(req: Request) {
 		return NextResponse.json({ ok: false, message: "DB unavailable" }, { status: 500 });
 	}
 
-	const body = (await req.json().catch(() => null)) as { email?: unknown; captcha?: unknown } | null;
+	const body = (await req.json().catch(() => null)) as { email?: unknown; captcha?: unknown; turnstile_token?: unknown } | null;
 	const email = typeof body?.email === "string" ? body.email.toLowerCase().trim() : "";
-	const captcha = typeof body?.captcha === "string" ? body.captcha.trim().toLowerCase() : "";
+	const captcha = typeof body?.captcha === "string" ? body.captcha.trim() : "";
+	const turnstileToken = typeof body?.turnstile_token === "string" ? body.turnstile_token : "";
+	// Accept turnstile token from either field for compatibility
+	const tokenForVerify = turnstileToken || (TURNSTILE_SECRET_KEY ? captcha : "");
 	const expectedCaptcha = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
-
 	if (!email) {
 		return NextResponse.json({ ok: false, message: "Email required" }, { status: 400 });
 	}
-	if (captcha !== expectedCaptcha) {
-		return NextResponse.json({ ok: false, message: "captcha failed" }, { status: 400 });
+	if (TURNSTILE_SECRET_KEY) {
+		const ok = await verifyTurnstile(tokenForVerify);
+		if (!ok) return NextResponse.json({ ok: false, message: "captcha failed" }, { status: 400 });
+	} else {
+		if (captcha.toLowerCase() !== expectedCaptcha) {
+			return NextResponse.json({ ok: false, message: "captcha failed" }, { status: 400 });
+		}
 	}
 
 	const user = await db
@@ -69,4 +77,24 @@ export async function POST(req: Request) {
 	}
 
 	return NextResponse.json({ ok: true, sent: true });
+}
+
+async function verifyTurnstile(token: string): Promise<boolean> {
+	if (!TURNSTILE_SECRET_KEY) return false;
+	if (!token) return false;
+	try {
+		const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				secret: TURNSTILE_SECRET_KEY,
+				response: token,
+			}),
+		});
+		const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
+		return !!data?.success;
+	} catch (err) {
+		console.error("Turnstile verify failed", err);
+		return false;
+	}
 }
