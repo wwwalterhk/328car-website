@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 
 export type ImageSlot = "front" | "left" | "right" | "back" | "interior1" | "interior2";
 
@@ -39,8 +40,8 @@ export default function SlotUploader({ slot, current, onFiles, onRemove }: Props
 				onClick={() => ref.current?.click()}
 			>
 				{current ? (
-					<div className="w-full overflow-hidden rounded-lg border border-[color:var(--surface-border)] bg-white">
-						<img src={current.url} alt={LABELS[slot]} className="h-28 w-full object-cover" />
+					<div className="relative w-full overflow-hidden rounded-lg border border-[color:var(--surface-border)] bg-white" style={{ paddingBottom: "55%" }}>
+						<Image src={current.url} alt={LABELS[slot]} fill className="object-cover" sizes="160px" />
 					</div>
 				) : (
 					<>

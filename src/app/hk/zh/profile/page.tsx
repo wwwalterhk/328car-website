@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
+import { useRef } from "react";
+import Image from "next/image";
 
 type ProfileResponse = {
 	ok: boolean;
-	user?: { user_pk: number; email: string; name: string | null; avatar_url: string | null };
+	user?: { user_pk: number; user_id: string | null; email: string; name: string | null; avatar_url: string | null };
 	listings?: Array<{
 		id: string;
 		title: string | null;
@@ -28,8 +30,10 @@ export default function ProfilePage() {
 	const [profile, setProfile] = useState<ProfileResponse | null>(null);
 	const [name, setName] = useState("");
 	const [avatar, setAvatar] = useState("");
+	const [avatarFile, setAvatarFile] = useState<File | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [saveMsg, setSaveMsg] = useState<string | null>(null);
+	const fileInputRef = useRef<HTMLInputElement | null>(null);
 
 	useEffect(() => {
 		if (status !== "authenticated") return;
@@ -47,16 +51,37 @@ export default function ProfilePage() {
 			.finally(() => setLoading(false));
 	}, [status]);
 
+	const handleAvatarFiles = (files: FileList | null) => {
+		const file = files?.[0];
+		if (!file) return;
+		setAvatarFile(file);
+		const url = URL.createObjectURL(file);
+		setAvatar(url);
+	};
+
 	const handleSave = async () => {
+		const origName = profile?.user?.name || "";
+		const origAvatar = profile?.user?.avatar_url || "";
+		const noAvatarChange = !avatarFile && avatar === origAvatar;
+		if (name.trim() === origName && noAvatarChange) {
+			setSaveMsg("No changes to save.");
+			return;
+		}
 		setSaving(true);
 		setSaveMsg(null);
 		try {
 			const res = await fetch("/api/profile", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name, avatar_url: avatar }),
+				body: JSON.stringify({
+					name,
+					avatar_url: avatarFile ? undefined : avatar === origAvatar ? undefined : avatar,
+					avatar_data: avatarFile ? await fileToDataUrl(avatarFile) : undefined,
+				}),
 			});
 			if (res.ok) {
+				const data = (await res.json().catch(() => null)) as { avatar_url?: string } | null;
+				if (data?.avatar_url) setAvatar(data.avatar_url);
 				setSaveMsg("Profile updated.");
 			} else {
 				const data = (await res.json().catch(() => null)) as { message?: string } | null;
@@ -100,10 +125,42 @@ export default function ProfilePage() {
 				<div>
 					<div className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--txt-3)]">Profile</div>
 					<h1 className="text-3xl font-semibold">Your account</h1>
-					<p className="text-sm text-[color:var(--txt-3)]">Edit your name and avatar. Listings below belong to this account.</p>
+					<p className="text-sm text-[color:var(--txt-3)]">
+						Edit your name and avatar. Listings below belong to this account. User ID: {profile?.user?.user_id || "—"}
+					</p>
 				</div>
 
 				<div className="space-y-4 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-6 shadow-sm">
+					<div className="flex items-center gap-4">
+						<div
+							onClick={() => fileInputRef.current?.click()}
+							onDragOver={(e) => e.preventDefault()}
+							onDrop={(e) => {
+								e.preventDefault();
+								handleAvatarFiles(e.dataTransfer.files);
+							}}
+							className="relative h-24 w-24 cursor-pointer overflow-hidden rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-2)] ring-1 ring-transparent transition hover:ring-[color:var(--accent-1)]/40"
+							title="Click or drop to change avatar"
+						>
+							{avatar ? (
+								<Image src={avatar} alt="avatar" fill className="object-cover" sizes="96px" unoptimized />
+							) : (
+								<div className="flex h-full w-full items-center justify-center text-xs text-[color:var(--txt-3)]">No avatar</div>
+							)}
+							<div className="absolute inset-0 flex items-center justify-center bg-black/30 text-[10px] font-semibold uppercase tracking-[0.18em] text-white opacity-0 transition hover:opacity-100">
+								Change
+							</div>
+						</div>
+						<div className="text-sm text-[color:var(--txt-2)] break-all">{profile?.user?.email || ""}</div>
+					</div>
+					<input
+						ref={fileInputRef}
+						type="file"
+						accept="image/*"
+						className="hidden"
+						onChange={(e) => handleAvatarFiles(e.target.files)}
+					/>
+
 					<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
 						Name
 						<input
@@ -114,16 +171,9 @@ export default function ProfilePage() {
 							placeholder="Your name"
 						/>
 					</label>
-					<label className="block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
-						Avatar URL
-						<input
-							type="url"
-							value={avatar}
-							onChange={(e) => setAvatar(e.target.value)}
-							className="mt-2 w-full rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 text-sm text-[color:var(--txt-1)] outline-none transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25"
-							placeholder="https://…"
-						/>
-					</label>
+					<div className="text-[11px] text-[color:var(--txt-3)]">
+						Click the avatar to select a file, or drag & drop a photo. We’ll resize to 150px square and upload to /avatar in CDN.
+					</div>
 					<div className="flex items-center gap-3">
 						<button
 							type="button"
@@ -156,7 +206,7 @@ export default function ProfilePage() {
 									>
 										<div className="h-20 w-28 overflow-hidden rounded-xl bg-[color:var(--cell-2)]">
 											{photos[0] ? (
-												<img src={photos[0]} alt={l.title ?? l.id} className="h-full w-full object-cover" />
+												<Image src={photos[0]} alt={l.title ?? l.id} fill className="object-cover" sizes="112px" unoptimized />
 											) : (
 												<div className="flex h-full w-full items-center justify-center text-xs text-[color:var(--txt-3)]">No photo</div>
 											)}
@@ -189,4 +239,13 @@ export default function ProfilePage() {
 			</div>
 		</main>
 	);
+}
+
+async function fileToDataUrl(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(reader.result as string);
+		reader.onerror = () => reject(reader.error);
+		reader.readAsDataURL(file);
+	});
 }

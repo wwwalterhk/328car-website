@@ -350,6 +350,7 @@ VALUES
 -- Core users
 CREATE TABLE IF NOT EXISTS users (
   user_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT,
   email TEXT NOT NULL UNIQUE,
   name TEXT,
   avatar_url TEXT,
@@ -361,6 +362,8 @@ CREATE TABLE IF NOT EXISTS users (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id);
 
 -- OAuth accounts (Google, etc.)
 CREATE TABLE IF NOT EXISTS user_accounts (
