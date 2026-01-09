@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import type { PhotoRecord } from "./types";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database; R2?: R2Bucket };
 
@@ -26,14 +27,14 @@ export async function GET(_: Request, context: any) {
 
 	if (!listing) return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
 
-	let photos: Array<{ pos: number | null; url: string | null; url_r2?: string | null; url_r2_square?: string | null }> = [];
+	let photos: PhotoRecord[] = [];
 	const listingPk = (listing as { listing_pk?: number }).listing_pk;
 	if (listingPk) {
 		const rows = await db
 			.prepare("SELECT pos, url, url_r2, url_r2_square FROM car_listings_photo WHERE listing_pk = ? ORDER BY pos")
 			.bind(listingPk)
-			.all<{ pos: number | null; url: string | null; url_r2: string | null; url_r2_square: string | null }>();
-		photos = rows.results || [];
+			.all<PhotoRecord>();
+		photos = (rows.results || []).map((p) => ({ ...p, url_r2: p.url_r2 ?? p.url }));
 	}
 
 	return NextResponse.json({ ok: true, listing, photos });
@@ -82,7 +83,7 @@ export async function PUT(req: Request, context: any) {
 		contact?: string;
 		remark?: string;
 		sts?: number;
-		images?: Array<{ name?: string; small?: string; medium?: string; large?: string }>;
+		images?: Array<{ name?: string; small?: string; medium?: string; large?: string; pos?: number }>;
 	} | null;
 
 	if (!body?.brand || !body.model || body.model.trim().length < 2) {
@@ -165,7 +166,7 @@ export async function PUT(req: Request, context: any) {
                VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(listing_pk, url) DO UPDATE SET url_r2 = excluded.url_r2, url_r2_square = excluded.url_r2_square, pos = excluded.pos`
 						)
-						.bind(listingPk, idx, urls.large, urls.small ?? null, urls.medium ?? null)
+						.bind(listingPk, typeof img.pos === "number" ? img.pos : idx, urls.large, urls.small ?? null, urls.medium ?? null)
 						.run();
 				} catch (err) {
 					console.error("car_listings_photo insert failed (edit)", err);

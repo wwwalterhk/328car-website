@@ -68,6 +68,7 @@ export async function POST(req: Request) {
 			small?: string; // base64 data URL
 			medium?: string;
 			large?: string;
+			pos?: number;
 		}>;
 	} | null;
 
@@ -220,6 +221,7 @@ export async function POST(req: Request) {
 			if (urls.large) photos.push(urls.large);
 			if (targetListingPk && urls.large) {
 				// pos 0..5 mapping to order received
+				const pos = typeof img.pos === "number" ? img.pos : idx;
 				try {
 					await db
 						.prepare(
@@ -227,7 +229,7 @@ export async function POST(req: Request) {
              VALUES (?, ?, ?, ?, ?)
              ON CONFLICT(listing_pk, url) DO UPDATE SET url_r2 = excluded.url_r2, url_r2_square = excluded.url_r2_square, pos = excluded.pos`
 						)
-						.bind(targetListingPk, idx, urls.large, urls.small ?? null, urls.medium ?? null)
+						.bind(targetListingPk, pos, urls.large, urls.small ?? null, urls.medium ?? null)
 						.run();
 				} catch (err) {
 					console.error("car_listings_photo insert failed", err);

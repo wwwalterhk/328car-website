@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import SellForm from "../../SellForm";
+import type { PhotoRecord } from "@/app/api/sell/[id]/types";
 
 type ListingData = Record<string, unknown>;
 
@@ -21,11 +22,17 @@ export default function EditSellPage() {
 			setError(null);
 			try {
 				const res = await fetch(`/api/sell/${id}`, { cache: "no-store" });
-				const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; listing?: ListingData };
+				const data = (await res.json().catch(() => ({}))) as {
+					ok?: boolean;
+					message?: string;
+					listing?: ListingData;
+					photos?: PhotoRecord[];
+				};
 				if (!res.ok || !data?.ok) {
 					setError(data?.message || "Failed to load listing");
 				} else {
-					setInitial(data.listing || null);
+					const photos = Array.isArray(data.photos) ? data.photos : [];
+					setInitial({ ...(data.listing || {}), photos_list: photos });
 				}
 			} catch (err) {
 				setError(String(err));

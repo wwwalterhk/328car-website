@@ -89,12 +89,35 @@ export default function SellForm(props?: SellProps) {
 	// Prefill when editing
 	useEffect(() => {
 		if (!initialListing) return;
-		setForm((prev) => ({
-			...prev,
-			brand: (initialListing.brand_slug as string) || (initialListing.brand as string) || prev.brand,
-			model: (initialListing.model as string) || prev.model,
-			year: initialListing.year ? String(initialListing.year) : "",
-			price: initialListing.price ? String(initialListing.price) : "",
+		const slotsByPos: Record<number, ImageSlot[]> = {
+			0: ["front"],
+			1: ["left"],
+			2: ["right"],
+			3: ["back"],
+			4: ["interior1"],
+			5: ["interior2"],
+		};
+		const mappedImages: Array<{ slot: ImageSlot; file: File; url: string }> = [];
+		const photosList = (initialListing.photos_list as PhotoRecord[] | undefined) || [];
+		if (photosList.length) {
+			const sorted = [...photosList].sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0));
+			for (const p of sorted) {
+				const pos = p.pos ?? -1;
+				const slot = slotsByPos[pos]?.find((s) => !mappedImages.find((m) => m.slot === s));
+				if (!slot) continue;
+				const url = p.url_r2 || p.url || "";
+				if (url) {
+					mappedImages.push({ slot, file: null as unknown as File, url });
+				}
+			}
+		}
+		setForm((prev) => {
+			return {
+				...prev,
+				brand: (initialListing.brand_slug as string) || (initialListing.brand as string) || prev.brand,
+				model: (initialListing.model as string) || prev.model,
+				year: initialListing.year ? String(initialListing.year) : "",
+				price: initialListing.price ? String(initialListing.price) : "",
 			mileage_km: initialListing.mileage_km ? String(initialListing.mileage_km) : "",
 			body_type: (initialListing.body_type as string) || prev.body_type,
 			transmission: (initialListing.transmission as string) || prev.transmission,
@@ -103,11 +126,13 @@ export default function SellForm(props?: SellProps) {
 			power_kw: initialListing.power_kw ? String(initialListing.power_kw) : "",
 			first_registration_count: initialListing.first_registration_count ? String(initialListing.first_registration_count) : "",
 			licence_expiry: (initialListing.licence_expiry as string) || "",
-			color: (initialListing.color as string) || prev.color,
-			remark: (initialListing.remark as string) || prev.remark,
-			vehicle_type: (initialListing.vehicle_type as string) || prev.vehicle_type,
-			seats: initialListing.seats ? String(initialListing.seats) : prev.seats,
-		}));
+				color: (initialListing.color as string) || prev.color,
+				remark: (initialListing.remark as string) || prev.remark,
+				vehicle_type: (initialListing.vehicle_type as string) || prev.vehicle_type,
+				seats: initialListing.seats ? String(initialListing.seats) : prev.seats,
+				images: mappedImages.filter((img) => img.url),
+			};
+		});
 	}, [initialListing]);
 
 	const handleChange = (key: keyof FormState) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -491,7 +516,7 @@ async function prepareImages(images: Array<{ file: File; url: string; slot?: Ima
 
 	const results: Array<{ name?: string; small?: string; medium?: string; large?: string }> = [];
 
-	for (const { file } of images.slice(0, 6)) {
+	for (const { file } of images.filter((img) => img.file instanceof File).slice(0, 6)) {
 		const img = await fileToImage(file);
 		if (!img) continue;
 

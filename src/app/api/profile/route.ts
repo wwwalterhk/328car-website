@@ -31,16 +31,29 @@ export async function GET() {
 
 	const listings = await db
 		.prepare(
-			`SELECT id, title, price, year, mileage_km, sts, created_at, photos, vehicle_type, body_type
+			`SELECT listing_pk, id, title, price, year, mileage_km, sts, created_at, photos, vehicle_type, body_type
        FROM car_listings WHERE user_pk = ? ORDER BY created_at DESC`
 		)
 		.bind(user.user_pk)
-		.all();
+		.all<{ listing_pk: number; id: string; title: string | null; price: number | null; year: number | null; mileage_km: number | null; sts: number | null; created_at: string | null; photos: string | null; vehicle_type: string | null; body_type: string | null }>();
+
+	const listingsWithPhotos = [];
+	for (const l of listings.results || []) {
+		let photos_list: Array<{ pos: number | null; url_r2?: string | null; url?: string | null }> = [];
+		if (l.listing_pk) {
+			const photoRows = await db
+				.prepare("SELECT pos, url, url_r2, url_r2_square FROM car_listings_photo WHERE listing_pk = ? ORDER BY pos")
+				.bind(l.listing_pk)
+				.all<{ pos: number | null; url: string | null; url_r2: string | null; url_r2_square: string | null }>();
+			photos_list = photoRows.results || [];
+		}
+		listingsWithPhotos.push({ ...l, photos_list });
+	}
 
 	return NextResponse.json({
 		ok: true,
 		user,
-		listings: listings.results ?? [],
+		listings: listingsWithPhotos,
 	});
 }
 

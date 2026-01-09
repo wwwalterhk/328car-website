@@ -41,7 +41,7 @@ export default function SlotUploader({ slot, current, onFiles, onRemove }: Props
 			>
 				{current ? (
 					<div className="relative w-full overflow-hidden rounded-lg border border-[color:var(--surface-border)] bg-white" style={{ paddingBottom: "55%" }}>
-						<Image src={current.url} alt={LABELS[slot]} fill className="object-cover" sizes="160px" />
+						<Image src={current.url} alt={LABELS[slot]} fill className="object-cover" sizes="160px" unoptimized />
 					</div>
 				) : (
 					<>
