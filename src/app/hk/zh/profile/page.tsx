@@ -192,19 +192,13 @@ export default function ProfilePage() {
 					{profile?.listings && profile.listings.length > 0 ? (
 						<div className="grid gap-3">
 							{profile.listings.map((l) => {
-								const photos = (() => {
-									try {
-										return (l.photos ? JSON.parse(l.photos) : []) as string[];
-									} catch {
-										return [];
-									}
-								})();
+								const photos = extractPhotos(l);
 								return (
 									<div
 										key={l.id}
 										className="flex gap-4 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4"
 									>
-										<div className="h-20 w-28 overflow-hidden rounded-xl bg-[color:var(--cell-2)]">
+										<div className="relative h-20 w-28 overflow-hidden rounded-xl bg-[color:var(--cell-2)]">
 											{photos[0] ? (
 												<Image src={photos[0]} alt={l.title ?? l.id} fill className="object-cover" sizes="112px" unoptimized />
 											) : (
@@ -219,12 +213,22 @@ export default function ProfilePage() {
 											<div className="text-xs text-[color:var(--txt-3)]">
 												{l.price ? `HKD ${l.price.toLocaleString()}` : "No price"} • Mileage {l.mileage_km ?? "—"} km • Status {l.sts ?? "-"}
 											</div>
-											<Link
-												href={`/sell/${l.id}`}
-												className="text-xs font-semibold text-[color:var(--accent-1)] underline-offset-4 hover:underline"
-											>
-												View listing
-											</Link>
+											<div className="flex flex-wrap gap-2 pt-1">
+												{l.sts === 1 ? (
+													<Link
+														href={`/sell/${l.id}`}
+														className="inline-flex items-center gap-1 rounded-full border border-[color:var(--surface-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-2)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]"
+													>
+														View
+													</Link>
+												) : null}
+												<Link
+													href={`/hk/zh/sell/${l.id}/edit`}
+													className="inline-flex items-center gap-1 rounded-full border border-[color:var(--surface-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-1)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]"
+												>
+													Edit
+												</Link>
+											</div>
 										</div>
 									</div>
 								);
@@ -248,4 +252,25 @@ async function fileToDataUrl(file: File): Promise<string> {
 		reader.onerror = () => reject(reader.error);
 		reader.readAsDataURL(file);
 	});
+}
+
+type ListingWithPhotosList = {
+	photos?: string | null;
+	photos_list?: Array<{ url_r2?: string | null; url?: string | null }>;
+};
+
+function extractPhotos(listing: ListingWithPhotosList): string[] {
+	const list: string[] = [];
+	if (listing.photos_list && Array.isArray(listing.photos_list)) {
+		for (const p of listing.photos_list) {
+			if (p?.url_r2) list.push(p.url_r2);
+			else if (p?.url) list.push(p.url);
+		}
+	}
+	if (list.length) return list;
+	try {
+		return (listing.photos ? JSON.parse(listing.photos) : []) as string[];
+	} catch {
+		return [];
+	}
 }

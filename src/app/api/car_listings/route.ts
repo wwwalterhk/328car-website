@@ -71,11 +71,12 @@ const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 1000;
 const SELECT_LISTING_PK_SQL = `SELECT listing_pk FROM car_listings WHERE site = ? AND id = ?`;
 const UPSERT_PHOTO_SQL = `
-INSERT INTO car_listings_photo (listing_pk, url, url_r2, url_r2_square)
-VALUES (?, ?, ?, ?)
+INSERT INTO car_listings_photo (listing_pk, url, url_r2, url_r2_square, pos)
+VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(listing_pk, url) DO UPDATE SET
   url_r2 = excluded.url_r2,
-  url_r2_square = excluded.url_r2_square
+  url_r2_square = excluded.url_r2_square,
+  pos = excluded.pos
 `;
 const DELETE_PHOTOS_NOT_IN_SQL = (placeholders: number) =>
 	`DELETE FROM car_listings_photo WHERE listing_pk = ? AND url NOT IN (${Array.from({ length: placeholders })
@@ -465,12 +466,10 @@ async function syncPhotos(db: D1Database, listings: NormalizedListing[]) {
 		if (!listingPk) continue;
 
 		const incoming = listing.photosArray;
-		for (const photo of incoming) {
+		for (let idx = 0; idx < incoming.length; idx++) {
+			const photo = incoming[idx];
 			try {
-				const res = await db
-					.prepare(UPSERT_PHOTO_SQL)
-					.bind(listingPk, photo.orig, photo.r2, photo.r2_square)
-					.run();
+				const res = await db.prepare(UPSERT_PHOTO_SQL).bind(listingPk, photo.orig, photo.r2, photo.r2_square, idx).run();
 				inserted += res.meta.changes ?? 0;
 			} catch (error) {
 				console.warn("Failed to upsert photo", { listingPk, photo, error });

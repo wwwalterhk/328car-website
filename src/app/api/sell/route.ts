@@ -165,7 +165,7 @@ export async function POST(req: Request) {
 
 	const now = new Date().toISOString();
 
-	await db
+	const insertRes = await db
 		.prepare(
 			`INSERT INTO car_listings (
         site, id, url, title, price, year, mileage_km, engine_cc, power_kw, transmission, fuel, brand, brand_slug,
@@ -202,15 +202,37 @@ export async function POST(req: Request) {
 			now
 		)
 		.run();
+	const listingPk = insertRes.meta?.last_row_id ?? null;
 
 	// Save images to R2 if provided
 	const photos: string[] = [];
 	if (body.images && body.images.length && env.R2) {
 		let idx = 0;
-		for (const img of body.images.slice(0, 5)) {
+	let targetListingPk: number | null = listingPk;
+	if (!targetListingPk) {
+		const listingPkRow = await db.prepare("SELECT listing_pk FROM car_listings WHERE site = '328car' AND id = ?").bind(id).first<{ listing_pk: number }>();
+		targetListingPk = listingPkRow?.listing_pk ?? null;
+	}
+
+		for (const img of body.images.slice(0, 6)) {
 			const keyBase = `sell/${id}/${idx}`;
 			const urls = await saveImageSizes(env.R2, keyBase, img);
 			if (urls.large) photos.push(urls.large);
+			if (targetListingPk && urls.large) {
+				// pos 0..5 mapping to order received
+				try {
+					await db
+						.prepare(
+							`INSERT INTO car_listings_photo (listing_pk, pos, url, url_r2_square, url_r2)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(listing_pk, url) DO UPDATE SET url_r2 = excluded.url_r2, url_r2_square = excluded.url_r2_square, pos = excluded.pos`
+						)
+						.bind(targetListingPk, idx, urls.large, urls.small ?? null, urls.medium ?? null)
+						.run();
+				} catch (err) {
+					console.error("car_listings_photo insert failed", err);
+				}
+			}
 			idx++;
 		}
 		if (photos.length) {

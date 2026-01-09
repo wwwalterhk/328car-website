@@ -88,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_car_listings_model_sts
 CREATE TABLE IF NOT EXISTS car_listings_photo (
   photo_pk INTEGER PRIMARY KEY AUTOINCREMENT,
   listing_pk INTEGER NOT NULL,
+  pos INTEGER, -- position/order of the photo
   url TEXT NOT NULL,
   url_r2_square TEXT,
   url_r2 TEXT,

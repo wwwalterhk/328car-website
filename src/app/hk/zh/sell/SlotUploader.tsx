@@ -25,7 +25,7 @@ export default function SlotUploader({ slot, current, onFiles, onRemove }: Props
 	const ref = useRef<HTMLInputElement | null>(null);
 
 	return (
-		<div className="space-y-2 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-3 text-sm text-[color:var(--txt-2)]">
+		<div className="space-y-2 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-3 text-sm text-[color:var(--txt-2)] photo-tile">
 			<div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">
 				{LABELS[slot]}
 			</div>
