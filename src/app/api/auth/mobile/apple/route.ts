@@ -56,11 +56,14 @@ export async function POST(request: Request) {
 		return NextResponse.json({ ok: false, message: "Token missing required claims" }, { status: 400 });
 	}
 
+	const userId = await generateUserId(db, email);
+	const displayName = name || userId;
 	await db
 		.prepare(
-			`INSERT INTO users (email, name, avatar_url, locale, last_login_from, status)
-       VALUES (?, ?, ?, ?, ?, ?)
+			`INSERT INTO users (email, user_id, name, avatar_url, locale, last_login_from, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(email) DO UPDATE SET
+         user_id = COALESCE(users.user_id, excluded.user_id),
          name = COALESCE(excluded.name, users.name),
          avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
          locale = COALESCE(excluded.locale, users.locale),
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
          status = COALESCE(users.status, excluded.status, users.status),
          updated_at = datetime('now')`
 		)
-		.bind(email, name, null, locale, "ios-apple", emailVerified ? "active" : "pending", "ios-apple")
+		.bind(email, userId, displayName, null, locale, "ios-apple", emailVerified ? "active" : "pending", "ios-apple")
 		.run();
 
 	const user = await db
@@ -97,4 +100,18 @@ export async function POST(request: Request) {
 
 function readString(value: unknown): string | null {
 	return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function generateUserId(db: D1Database, email: string): Promise<string> {
+	const localPart = (email.split("@")[0] || "user").toLowerCase();
+	const base = localPart.replace(/[^a-z0-9_-]/g, "") || "user";
+	let candidate = base;
+	let suffix = 0;
+	for (let i = 0; i < 500; i++) {
+		const exists = await db.prepare("SELECT 1 FROM users WHERE user_id = ? LIMIT 1").bind(candidate).first<{ 1: number }>();
+		if (!exists) return candidate;
+		suffix += 1;
+		candidate = `${base}${suffix}`;
+	}
+	throw new Error("Could not generate unique user_id");
 }

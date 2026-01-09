@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRef } from "react";
-import Image from "next/image";
+import NextImage from "next/image";
 
 type ProfileResponse = {
 	ok: boolean;
@@ -76,7 +76,7 @@ export default function ProfilePage() {
 				body: JSON.stringify({
 					name,
 					avatar_url: avatarFile ? undefined : avatar === origAvatar ? undefined : avatar,
-					avatar_data: avatarFile ? await fileToDataUrl(avatarFile) : undefined,
+					avatar_data: avatarFile ? await resizeFileToSquareDataUrl(avatarFile, 200) : undefined,
 				}),
 			});
 			if (res.ok) {
@@ -143,7 +143,7 @@ export default function ProfilePage() {
 							title="Click or drop to change avatar"
 						>
 							{avatar ? (
-								<Image src={avatar} alt="avatar" fill className="object-cover" sizes="96px" unoptimized />
+								<NextImage src={avatar} alt="avatar" fill className="object-cover" sizes="96px" unoptimized />
 							) : (
 								<div className="flex h-full w-full items-center justify-center text-xs text-[color:var(--txt-3)]">No avatar</div>
 							)}
@@ -172,7 +172,7 @@ export default function ProfilePage() {
 						/>
 					</label>
 					<div className="text-[11px] text-[color:var(--txt-3)]">
-						Click the avatar to select a file, or drag & drop a photo. We’ll resize to 150px square and upload to /avatar in CDN.
+						Click the avatar to select a file, or drag & drop a photo. We’ll resize to 200px square and upload to /avatar in CDN.
 					</div>
 					<div className="flex items-center gap-3">
 						<button
@@ -200,7 +200,7 @@ export default function ProfilePage() {
 									>
 										<div className="relative h-20 w-28 overflow-hidden rounded-xl bg-[color:var(--cell-2)]">
 											{photos[0] ? (
-												<Image src={photos[0]} alt={l.title ?? l.id} fill className="object-cover" sizes="112px" unoptimized />
+												<NextImage src={photos[0]} alt={l.title ?? l.id} fill className="object-cover" sizes="112px" unoptimized />
 											) : (
 												<div className="flex h-full w-full items-center justify-center text-xs text-[color:var(--txt-3)]">No photo</div>
 											)}
@@ -251,6 +251,36 @@ async function fileToDataUrl(file: File): Promise<string> {
 		reader.onload = () => resolve(reader.result as string);
 		reader.onerror = () => reject(reader.error);
 		reader.readAsDataURL(file);
+	});
+}
+
+async function resizeFileToSquareDataUrl(file: File, size: number): Promise<string> {
+	const dataUrl = await fileToDataUrl(file);
+	const img = await loadImage(dataUrl);
+	if (!img) return dataUrl;
+	const canvas = document.createElement("canvas");
+	canvas.width = size;
+	canvas.height = size;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) return dataUrl;
+	const scale = Math.max(size / img.width, size / img.height);
+	const drawW = img.width * scale;
+	const drawH = img.height * scale;
+	const dx = (size - drawW) / 2;
+	const dy = (size - drawH) / 2;
+	ctx.fillStyle = "#ffffff";
+	ctx.fillRect(0, 0, size, size);
+	ctx.drawImage(img, dx, dy, drawW, drawH);
+	return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+	return new Promise((resolve) => {
+		if (typeof window === "undefined" || typeof window.Image === "undefined") return resolve(null);
+		const img = new window.Image();
+		img.onload = () => resolve(img);
+		img.onerror = () => resolve(null);
+		img.src = src;
 	});
 }
 

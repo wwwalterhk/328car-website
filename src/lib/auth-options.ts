@@ -28,18 +28,21 @@ async function persistOauthUser(user: User, account: Account | null, profile?: P
 	const avatarUrl = readString(user.image) ?? readString(getProfilePicture(profile));
 	const locale = readString(getProfileLocale(profile));
 
+	const userId = await generateUserId(db, email);
+	const displayName = name || userId;
 	await db
 		.prepare(
-			`INSERT INTO users (email, name, avatar_url, locale, last_login_from)
-       VALUES (?, ?, ?, ?, ?)
+			`INSERT INTO users (email, user_id, name, avatar_url, locale, last_login_from)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(email) DO UPDATE SET
+         user_id = COALESCE(users.user_id, excluded.user_id),
          name = COALESCE(excluded.name, users.name),
          avatar_url = COALESCE(excluded.avatar_url, users.avatar_url),
          locale = COALESCE(excluded.locale, users.locale),
          last_login_from = ?,
          updated_at = datetime('now')`
 		)
-		.bind(email, name, avatarUrl, locale, account.provider, account.provider)
+		.bind(email, userId, displayName, avatarUrl, locale, account.provider, account.provider)
 		.run();
 
 	const existing = await db
@@ -133,6 +136,7 @@ export const authOptions: NextAuthOptions = {
 					if (intent === "register") {
 						const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
 						if (!captcha || captcha.toLowerCase() !== expected) {
+							console.warn("register captcha failed", { email, captcha });
 							throw new Error("captcha failed");
 						}
 					}
@@ -141,7 +145,7 @@ export const authOptions: NextAuthOptions = {
 					try {
 						await db
 							.prepare("INSERT INTO users (email, user_id, name, avatar_url, status) VALUES (?, ?, ?, ?, ?)")
-							.bind(email, userId, null, null, "pending")
+							.bind(email, userId, userId, null, "pending")
 							.run();
 					} catch (error) {
 						console.error("User insert failed:", error);
@@ -170,6 +174,7 @@ export const authOptions: NextAuthOptions = {
 							console.error("Activation email send failed:", error);
 						}
 					}
+					console.info("Credentials register success (pending activation)", { email, user_pk: newUser.user_pk });
 					throw new Error("Activation required. Check your email for the activation link.");
 				}
 
