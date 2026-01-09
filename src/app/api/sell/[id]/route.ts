@@ -99,9 +99,17 @@ export async function PUT(req: Request, context: any) {
 	}
 
 	const status = body.sts === 4 ? 4 : 1;
-	const existingPhotos = typeof existing.photos === "string" ? existing.photos : null;
+	const listingPk = (existing as { listing_pk?: number }).listing_pk ?? null;
+	let existingPhotoCount = 0;
+	if (listingPk) {
+		const existingRows = await db
+			.prepare("SELECT COUNT(1) as cnt FROM car_listings_photo WHERE listing_pk = ?")
+			.bind(listingPk)
+			.first<{ cnt: number }>();
+		existingPhotoCount = existingRows?.cnt ?? 0;
+	}
 	const keepPhotos = !body.images || !body.images.length;
-	if (status !== 4 && keepPhotos && !existingPhotos) {
+	if (status !== 4 && keepPhotos && existingPhotoCount === 0) {
 		return NextResponse.json({ ok: false, message: "At least one photo is required." }, { status: 400 });
 	}
 
@@ -149,38 +157,65 @@ export async function PUT(req: Request, context: any) {
 		)
 		.run();
 
-	let photosJson = existingPhotos;
+	let photosJson: string | null = null;
 	if (!keepPhotos && body.images && body.images.length && env.R2) {
-		const photos: string[] = [];
-		let idx = 0;
 		const listingPk = (existing as { listing_pk?: number }).listing_pk ?? null;
+		const uploads: Array<{ pos: number; urls: { small?: string; medium?: string; large?: string } }> = [];
+		let idx = 0;
+		const version = Date.now();
 		for (const img of body.images.slice(0, 6)) {
-			const keyBase = `sell/${params.id}/${idx}`;
+			const pos = typeof img.pos === "number" ? img.pos : idx;
+			const keyBase = `sell/${params.id}/${pos}_${version}`;
 			const urls = await saveImageSizes(env.R2, keyBase, img);
-			if (urls.large) photos.push(urls.large);
-			if (listingPk && urls.large) {
+			uploads.push({ pos, urls });
+			idx++;
+		}
+
+		if (listingPk) {
+			for (const { pos, urls } of uploads) {
+				if (!urls.large) continue;
 				try {
+					// Replace any existing photo at this position before inserting the new one
+					await db.prepare("DELETE FROM car_listings_photo WHERE listing_pk = ? AND pos = ?").bind(listingPk, pos).run();
 					await db
 						.prepare(
 							`INSERT INTO car_listings_photo (listing_pk, pos, url, url_r2_square, url_r2)
                VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(listing_pk, url) DO UPDATE SET url_r2 = excluded.url_r2, url_r2_square = excluded.url_r2_square, pos = excluded.pos`
 						)
-						.bind(listingPk, typeof img.pos === "number" ? img.pos : idx, urls.large, urls.small ?? null, urls.medium ?? null)
+						.bind(listingPk, pos, urls.large, urls.small ?? null, urls.medium ?? null)
 						.run();
 				} catch (err) {
 					console.error("car_listings_photo insert failed (edit)", err);
 				}
 			}
-			idx++;
 		}
-		if (photos.length) {
-			photosJson = JSON.stringify(photos);
-			await db
-				.prepare("UPDATE car_listings SET photos = ? WHERE site = '328car' AND id = ? AND user_pk = ?")
-				.bind(photosJson, params.id, user.user_pk)
-				.run();
+
+		if (listingPk) {
+			// Rebuild photos JSON from current rows so existing untouched images are preserved
+			const rows = await db
+				.prepare("SELECT pos, url FROM car_listings_photo WHERE listing_pk = ? ORDER BY pos")
+				.bind(listingPk)
+				.all<{ pos: number; url: string }>();
+			const urls = (rows.results || []).map((r) => r.url).filter(Boolean);
+			if (urls.length) {
+				photosJson = JSON.stringify(urls);
+			}
+		} else {
+			// Fallback: still update photos JSON if we cannot resolve the PK (should be rare)
+			const urls = uploads.map((u) => u.urls.large).filter(Boolean);
+			if (urls.length) {
+				photosJson = JSON.stringify(urls);
+			}
 		}
+	} else if (listingPk) {
+		// No uploads; return current photos for convenience
+		const rows = await db
+			.prepare("SELECT pos, url FROM car_listings_photo WHERE listing_pk = ? ORDER BY pos")
+			.bind(listingPk)
+			.all<{ pos: number; url: string }>();
+		const urls = (rows.results || []).map((r) => r.url).filter(Boolean);
+		if (urls.length) photosJson = JSON.stringify(urls);
 	}
 
 	return NextResponse.json({ ok: true, photos: photosJson ? JSON.parse(photosJson) : [] });

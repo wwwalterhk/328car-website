@@ -203,25 +203,36 @@ export async function POST(req: Request) {
 			now
 		)
 		.run();
-	const listingPk = insertRes.meta?.last_row_id ?? null;
+	const listingPkRow = await db
+		.prepare("SELECT listing_pk FROM car_listings WHERE site = '328car' AND id = ? LIMIT 1")
+		.bind(id)
+		.first<{ listing_pk: number }>();
+	const listingPk = listingPkRow?.listing_pk ?? insertRes.meta?.last_row_id ?? null;
 
 	// Save images to R2 if provided
 	const photos: string[] = [];
 	if (body.images && body.images.length && env.R2) {
 		let idx = 0;
-	let targetListingPk: number | null = listingPk;
-	if (!targetListingPk) {
-		const listingPkRow = await db.prepare("SELECT listing_pk FROM car_listings WHERE site = '328car' AND id = ?").bind(id).first<{ listing_pk: number }>();
-		targetListingPk = listingPkRow?.listing_pk ?? null;
-	}
+		let targetListingPk: number | null = listingPk;
+		if (!targetListingPk) {
+			const fallback = await db
+				.prepare("SELECT listing_pk FROM car_listings WHERE site = '328car' AND id = ? LIMIT 1")
+				.bind(id)
+				.first<{ listing_pk: number }>();
+			targetListingPk = fallback?.listing_pk ?? null;
+			if (!targetListingPk) {
+				console.warn("car_listings_photo: listing_pk not resolved for id", id);
+			}
+		}
 
+		const version = Date.now();
 		for (const img of body.images.slice(0, 6)) {
-			const keyBase = `sell/${id}/${idx}`;
+			const pos = typeof img.pos === "number" ? img.pos : idx;
+			const keyBase = `sell/${id}/${pos}_${version}`;
 			const urls = await saveImageSizes(env.R2, keyBase, img);
 			if (urls.large) photos.push(urls.large);
 			if (targetListingPk && urls.large) {
 				// pos 0..5 mapping to order received
-				const pos = typeof img.pos === "number" ? img.pos : idx;
 				try {
 					await db
 						.prepare(
@@ -236,12 +247,6 @@ export async function POST(req: Request) {
 				}
 			}
 			idx++;
-		}
-		if (photos.length) {
-			await db
-				.prepare("UPDATE car_listings SET photos = ? WHERE site = '328car' AND id = ?")
-				.bind(JSON.stringify(photos), id)
-				.run();
 		}
 	}
 

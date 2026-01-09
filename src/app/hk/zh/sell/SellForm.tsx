@@ -507,6 +507,15 @@ function TextField({
 	);
 }
 
+const SLOT_POS: Record<ImageSlot, number> = {
+	front: 0,
+	left: 1,
+	right: 2,
+	back: 3,
+	interior1: 4,
+	interior2: 5,
+};
+
 async function prepareImages(images: Array<{ file: File; url: string; slot?: ImageSlot }>) {
 	const targets = [
 		{ label: "small", width: 200, height: 200 },
@@ -514,13 +523,16 @@ async function prepareImages(images: Array<{ file: File; url: string; slot?: Ima
 		{ label: "large", width: Math.round((1024 * 4) / 3), height: 1024 },
 	] as const;
 
-	const results: Array<{ name?: string; small?: string; medium?: string; large?: string }> = [];
+	const results: Array<{ name?: string; small?: string; medium?: string; large?: string; pos?: number }> = [];
 
-	for (const { file } of images.filter((img) => img.file instanceof File).slice(0, 6)) {
+	for (const { file, slot } of images.filter((img) => img.file instanceof File).slice(0, 6)) {
 		const img = await fileToImage(file);
 		if (!img) continue;
 
-		const out: { name?: string; small?: string; medium?: string; large?: string } = { name: file.name };
+		const out: { name?: string; small?: string; medium?: string; large?: string; pos?: number } = { name: file.name };
+		if (slot && typeof SLOT_POS[slot] === "number") {
+			out.pos = SLOT_POS[slot];
+		}
 		for (const t of targets) {
 			const url = await resizeCoverToDataUrl(img, t.width, t.height);
 			if (url) {
