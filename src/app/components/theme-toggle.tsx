@@ -70,7 +70,7 @@ export default function ThemeToggle() {
 		<button
 			type="button"
 			onClick={cycleMode}
-			className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] shadow-[0_12px_24px_-16px_rgba(15,23,42,0.4)] backdrop-blur hover:-translate-y-0.5 hover:shadow"
+			className="fixed bottom-4 right-4 z-50 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] shadow-[0_12px_24px_-16px_rgba(15,23,42,0.4)] backdrop-blur hover:-translate-y-0.5 hover:shadow theme-selector"
 			style={{
 				backgroundColor: "color-mix(in srgb, var(--background) 92%, transparent)",
 				borderColor: "color-mix(in srgb, var(--foreground) 20%, transparent)",

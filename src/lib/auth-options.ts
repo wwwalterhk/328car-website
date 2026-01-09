@@ -7,6 +7,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { sendActivationEmail } from "./email";
 
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
+
 type DbBindings = CloudflareEnv & { DB?: D1Database };
 
 async function getDb(): Promise<D1Database | null> {
@@ -122,6 +124,7 @@ export const authOptions: NextAuthOptions = {
 				const password = readString(credentials?.password);
 				const intent = readString((credentials as Record<string, unknown> | undefined)?.mode) === "register" ? "register" : "signin";
 				const captcha = readString((credentials as Record<string, unknown> | undefined)?.captcha);
+				const turnstileToken = readString((credentials as Record<string, unknown> | undefined)?.turnstile_token);
 				if (!email || !password) return null;
 
 				await ensurePasswordTable(db);
@@ -134,10 +137,18 @@ export const authOptions: NextAuthOptions = {
 
 				if (!userRow) {
 					if (intent === "register") {
-						const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
-						if (!captcha || captcha.toLowerCase() !== expected) {
-							console.warn("register captcha failed", { email, captcha });
-							throw new Error("captcha failed");
+						if (TURNSTILE_SECRET_KEY) {
+							const ok = await verifyTurnstile(turnstileToken);
+							if (!ok) {
+								console.warn("register captcha failed (turnstile)", { email, turnstileToken });
+								throw new Error("captcha failed");
+							}
+						} else {
+							const expected = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
+							if (!captcha || captcha.toLowerCase() !== expected) {
+								console.warn("register captcha failed", { email, captcha });
+								throw new Error("captcha failed");
+							}
 						}
 					}
 					const { hash, salt } = hashPassword(password);
@@ -176,6 +187,9 @@ export const authOptions: NextAuthOptions = {
 					}
 					console.info("Credentials register success (pending activation)", { email, user_pk: newUser.user_pk });
 					throw new Error("Activation required. Check your email for the activation link.");
+				} else {
+					// Not found and not register intent
+					return null;
 				}
 
 				const pwdRow = await db
@@ -384,4 +398,26 @@ async function updateLastLogin(db: D1Database, userPk: number, source: string) {
 		.prepare("UPDATE users SET last_login_from = ?, updated_at = datetime('now') WHERE user_pk = ?")
 		.bind(source, userPk)
 		.run();
+}
+
+async function verifyTurnstile(token: string | null): Promise<boolean> {
+	if (!TURNSTILE_SECRET_KEY) return false;
+	if (!token) return false;
+	try {
+		console.info("Turnstile verify start", { hasSecret: !!TURNSTILE_SECRET_KEY });
+		const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				secret: TURNSTILE_SECRET_KEY,
+				response: token,
+			}),
+		});
+		const data = (await res.json().catch(() => null)) as { success?: boolean } | null;
+		console.info("Turnstile verify response", data);
+		return !!data?.success;
+	} catch (err) {
+		console.error("Turnstile verify failed", err);
+		return false;
+	}
 }

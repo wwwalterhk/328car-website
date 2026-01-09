@@ -5,20 +5,41 @@ import { sendActivationEmail } from "@/lib/email";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database };
 
+const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY || "";
+
 export async function POST(req: Request) {
 	const { env } = await getCloudflareContext({ async: true });
 	const db = (env as DbBindings).DB;
 	if (!db) return NextResponse.json({ ok: false, message: "DB unavailable" }, { status: 500 });
 
-	const body = (await req.json().catch(() => null)) as { email?: string; password?: string; captcha?: string } | null;
+	const body = (await req.json().catch(() => null)) as { email?: string; password?: string; captcha?: string; turnstile_token?: string } | null;
 	const email = readString(body?.email)?.toLowerCase() || "";
 	const password = typeof body?.password === "string" ? body.password : "";
 	const captcha = readString(body?.captcha) || "";
+	const turnstileToken = readString(body?.turnstile_token) || "";
 
 	if (!email || !password) return NextResponse.json({ ok: false, message: "Missing email or password" }, { status: 400 });
 
-	const expectedCaptcha = (process.env.REGISTER_CAPTCHA || "328car").toLowerCase();
-	if (captcha.toLowerCase() !== expectedCaptcha) {
+	// Require Turnstile for mobile registration
+	if (!TURNSTILE_SECRET_KEY) {
+		return NextResponse.json(
+			{ ok: false, message: "Captcha unavailable", message_code: "captcha_unavailable" },
+			{ status: 500 }
+		);
+	}
+	if (!turnstileToken) {
+		return NextResponse.json({ ok: false, message: "Captcha failed", message_code: "captcha_failed" }, { status: 400 });
+	}
+	const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+		method: "POST",
+		headers: { "Content-Type": "application/x-www-form-urlencoded" },
+		body: new URLSearchParams({
+			secret: TURNSTILE_SECRET_KEY,
+			response: turnstileToken,
+		}),
+	});
+	const verifyJson = (await verifyRes.json().catch(() => null)) as { success?: boolean } | null;
+	if (!verifyJson?.success) {
 		return NextResponse.json({ ok: false, message: "Captcha failed", message_code: "captcha_failed" }, { status: 400 });
 	}
 

@@ -5,7 +5,12 @@ import GoogleSignInButton from "@/app/components/google-signin-button";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState, useRef } from "react";
+
+type TurnstileApi = {
+	render: (el: HTMLElement, opts: { sitekey: string; callback: (token: string) => void; "error-callback": () => void; "expired-callback": () => void }) => string;
+	reset: (id: string) => void;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -42,11 +47,13 @@ function SignInPageContent() {
 	const [passwordInput, setPasswordInput] = useState("");
 	const [resendMessage, setResendMessage] = useState<string | null>(null);
 	const [resendLoading, setResendLoading] = useState(false);
+	const [resendPopup, setResendPopup] = useState<{ text: string; tone: "success" | "error" } | null>(null);
 
 	const [showForgot, setShowForgot] = useState(false);
 	const [forgotEmail, setForgotEmail] = useState("");
 	const [forgotCaptcha, setForgotCaptcha] = useState("");
 	const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
 	const searchParams = useSearchParams();
 	const router = useRouter();
@@ -93,6 +100,7 @@ function SignInPageContent() {
 				callbackUrl: "/?activation=1",
 				mode,
 				captcha,
+				turnstile_token: turnstileToken || undefined,
 			});
 
 			if (result?.error) {
@@ -120,6 +128,14 @@ function SignInPageContent() {
 
 	return (
 		<main className="min-h-screen text-[color:var(--txt-1)]">
+			{resendPopup ? (
+				<div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-3 shadow-md">
+					<div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--txt-3)]">
+						{resendPopup.tone === "success" ? "Success" : "Notice"}
+					</div>
+					<div className="mt-1 text-sm text-[color:var(--txt-1)]">{resendPopup.text}</div>
+				</div>
+			) : null}
 			<div
 				className="pointer-events-none fixed inset-0 -z-10"
 				style={{
@@ -163,23 +179,30 @@ function SignInPageContent() {
 											setFormError(null);
 											setResendLoading(true);
 											try {
-												const res = await fetch("/api/auth/resend-activation", {
-													method: "POST",
-													headers: { "Content-Type": "application/json" },
-													body: JSON.stringify({ email: emailInput }),
-												});
-												const data = (await res.json()) as { ok?: boolean; message?: string } | null;
-												if (res.ok && data?.ok) {
-													setResendMessage(data.message || "Activation email sent.");
-												} else {
-													setFormError(data?.message || "Resend failed");
-												}
-											} catch (err) {
-												setFormError(String(err));
-											} finally {
-												setResendLoading(false);
+											const res = await fetch("/api/auth/resend-activation", {
+												method: "POST",
+												headers: { "Content-Type": "application/json" },
+												body: JSON.stringify({ email: emailInput }),
+											});
+											const data = (await res.json()) as { ok?: boolean; message?: string } | null;
+											const msg = data?.message || (res.ok ? "Activation email sent." : "Resend failed");
+											if (res.ok && data?.ok) {
+												setResendMessage(msg);
+											} else {
+												setFormError(msg);
 											}
-										}}
+											if (msg) {
+												setResendPopup({ text: msg, tone: res.ok && data?.ok ? "success" : "error" });
+												setTimeout(() => setResendPopup(null), 4000);
+											}
+										} catch (err) {
+											setFormError(String(err));
+											setResendPopup({ text: String(err), tone: "error" });
+											setTimeout(() => setResendPopup(null), 4000);
+										} finally {
+											setResendLoading(false);
+										}
+									}}
 										className="inline-flex items-center gap-1 rounded-full border border-[color:var(--accent-1)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent-1)] transition hover:-translate-y-0.5 hover:shadow-sm disabled:opacity-70"
 									>
 										{resendLoading ? "Sending…" : "Resend activation"}
@@ -296,24 +319,26 @@ function SignInPageContent() {
 							</Field>
 
 							{mode === "register" ? (
-								<div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] p-4">
-									<Field label="Security check">
+								<div className="space-y-3">
+									<TurnstileWidget onToken={setTurnstileToken} />
+									<Field label="Security code (fallback)">
 										<input
 											type="text"
 											name="captcha"
-											required
 											className={[
 												"mt-1 w-full rounded-2xl border border-[color:var(--surface-border)]",
 												"bg-[color:var(--cell-1)] px-4 py-3",
 												"text-sm text-[color:var(--txt-1)] outline-none",
 												"transition focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
 											].join(" ")}
-											placeholder="Type 328car"
+											placeholder="Type 328car (used if Turnstile is unavailable)"
 											disabled={loading}
+											autoComplete="off"
+											spellCheck={false}
 										/>
 									</Field>
-									<p className="mt-2 text-xs text-[color:var(--txt-3)]">
-										Type <span className="font-semibold text-[color:var(--txt-2)]">328car</span> to continue.
+									<p className="text-[11px] text-[color:var(--txt-3)]">
+										Turnstile will be used when available; otherwise the text code is required.
 									</p>
 								</div>
 							) : null}
@@ -519,6 +544,54 @@ function Callout({
 		>
 			<div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-3)]">{title}</div>
 			<div className="mt-1">{children}</div>
+		</div>
+	);
+}
+
+function TurnstileWidget({ onToken }: { onToken: (token: string | null) => void }) {
+	const [scriptLoaded, setScriptLoaded] = useState(false);
+	const widgetRef = useRef<HTMLDivElement | null>(null);
+	const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAACLkrEqyfIKrPDn9";
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+		const win = window as unknown as { turnstile?: TurnstileApi };
+		if (win.turnstile) {
+			setScriptLoaded(true);
+			return;
+		}
+		const script = document.createElement("script");
+		script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+		script.async = true;
+		script.onload = () => setScriptLoaded(true);
+		document.head.appendChild(script);
+	}, []);
+
+	useEffect(() => {
+		const ts = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+		if (!scriptLoaded || !ts || !widgetRef.current) return;
+		const id = ts.render(widgetRef.current, {
+			sitekey: siteKey,
+			callback: (token: string) => onToken(token),
+			"error-callback": () => onToken(null),
+			"expired-callback": () => onToken(null),
+		});
+		return () => {
+			try {
+				ts.reset(id);
+			} catch {
+				// ignore
+			}
+		};
+	}, [scriptLoaded, siteKey, onToken]);
+
+	return (
+		<div className="rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] p-4">
+			<div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-3)]">Security check</div>
+			<div className="mt-3 flex justify-center">
+				<div ref={widgetRef} />
+			</div>
+			<p className="mt-2 text-[11px] text-[color:var(--txt-3)]">Protected by Turnstile.</p>
 		</div>
 	);
 }
