@@ -513,6 +513,7 @@ CREATE TABLE IF NOT EXISTS ai_search_log (
   ai_search_pk INTEGER PRIMARY KEY AUTOINCREMENT,
   user_pk INTEGER,
   search_id TEXT,
+  list_public INTEGER DEFAULT 0,
   ip_addr TEXT,
   query_text TEXT,
   remark TEXT,

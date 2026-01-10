@@ -34,7 +34,7 @@ export default function AiSearchHero() {
 	const startSearch = (e: React.FormEvent) => {
 		e.preventDefault();
 		const t = term.trim();
-		if (!t) return;
+		if (!t || t.length < 10) return;
 
 		setLoading(true);
 		setLocked(true);
@@ -232,14 +232,16 @@ export default function AiSearchHero() {
 							].join(" ")}
 						/>
 						<div className="mt-2 flex items-center justify-between text-xs text-[color:var(--txt-3)]">
-							<span>Try budget, year range, body style, or a specific trim.</span>
+							<span>
+								Try budget, year range, body style, or a specific trim. (Min 10 chars)
+							</span>
 							<span>{term.length}/40</span>
 						</div>
 					</div>
 
-					<button
-						type="submit"
-						disabled={!term.trim() || loading || locked}
+						<button
+							type="submit"
+						disabled={!term.trim() || term.trim().length < 10 || loading || locked}
 						className={[
 							"shrink-0 h-12 sm:h-11",
 							"rounded-2xl bg-[color:var(--accent-1)] px-6",
