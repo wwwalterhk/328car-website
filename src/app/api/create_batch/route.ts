@@ -485,32 +485,27 @@ function safeJsonParse<T>(text: string): T | null {
 }
 
 function buildPromptTemplate() {
-  return `return the model info in english of the car in json format and inspect the input_image for my car photos:
+  return `Return the model info in english of the car in json format and inspect the input_image for my car photos, no () or remark in any text:
 [return format]:
 {
 id: "my input id",
 site: "my input site",
 brand: "e.g. bmw",
-manu_model_code: "e.g. F20",
-body_type: "e.g. saloon, coupe",
+manu_model_code: "e.g. F20, this field is very important, try best effort to find precise one from photo,summary and remark",
+body_type: "e.g. saloon, coupe, suv, motorcycle etc. general popular body type name, no need to be specific",
 engine_cc: "e.g. 2300",
-power_kw:"e.g. 115kW, for electric car",
-horse_power_ps:"e.g. 200ps, for tranditional car",
+power_kw:"e.g. 115kW, for electric car, this field is very important, try best effort to find it from photo,summary and remark",
 facelift:"Y/N",
 transmission:"A/M, (A)uto or (M)anual",
-transmission_type:"Manual,Torque convertor, CVT etc",
-transmission_gears:"a number, e.g. 5 gears",
 range:"range of electric car, e.g. 400km,  best effort by model name, photo ,summary and  remark",
-power:"e.g. petrol, electric, hybrid, diesel etc",
-turbo: "turbo, na, optional",
-model_name: "general popular model name, e.g. 320i",
+power:"e.g. petrol, electric, hybrid, diesel etc, this field is very important, try best effort to find it from photo,summary and remark",
+model_name: "general popular shortest model name, e.g. 320i",
 detail_model_name: "e.g. 320i msport",
 mileage_km:"total used distance, e.g. 60000km",
-manu_color_name:"manu_color_name, e.g alpine white",
+manu_color_name:"manufacturer color name, e.g alpine white",
 gen_color_name:"general color name, e.g. white",
 gen_color_code:"general hex color code, e.g. #000000",
-options:[{item:"In tranditional chinese , best effort to list car options by photo ,summary and  remark"}, certainty:"visible,claimed etc"],
-remark:[{item:"In tranditional chinese, name of item (optional), e.g. manu_color_name", remark:"optional,when needed, remark for items of all, state only in here,  don't state in any fields"}]
+options:[{item:"In tranditional chinese , best effort to list car options by photo ,summary and remark"}, certainty:"visible,claimed etc"]
 }
 
 [data to check]:`;

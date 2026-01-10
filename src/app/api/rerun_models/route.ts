@@ -274,6 +274,8 @@ async function applyModelOutput(db: D1Database, payload: unknown): Promise<strin
 	const body_type_lower = firstPartLowerNullable(parsed.body_type);
 	const power_lower = firstPartLowerNullable(parsed.power);
 
+	const mileage_km = toRoundedIntString(readNullableIntegerRemoveString(parsed.mileage_km));
+
 	const engine_cc_100_int = roundToHundredNullable(parsed.engine_cc_100_int);
 	const power_kw_100_int = roundToHundredNullable(parsed.power_kw_100_int);
 	const output_100 = engine_cc_100_int ?? power_kw_100_int ?? null;
@@ -383,10 +385,10 @@ async function applyModelOutput(db: D1Database, payload: unknown): Promise<strin
 						.prepare(
 							`INSERT INTO models (
            brand, brand_slug, model_slug, manu_model_code, body_type, engine_cc, power_kw,
-           horse_power_ps, range, power, turbo, facelift, transmission, transmission_gears,
-           mileage_km, model_name, model_name_slug, manu_color_name, gen_color_name, gen_color_code, raw_json, output_100, output_100_decimal,
+           range, power, facelift, transmission,
+           model_name, model_name_slug, raw_json, output_100, output_100_decimal,
 		   engine_cc_100_int, power_kw_100_int, manu_model_code_slug, detail_model_name, detail_model_name_slug
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT DO UPDATE SET
            db_remark = ?`
 						)
@@ -398,19 +400,12 @@ async function applyModelOutput(db: D1Database, payload: unknown): Promise<strin
 							body_type_lower,
 							engine_cc,
 							power_kw,
-							horse_power_ps,
 							parsed.range,
 							power_lower,
-							parsed.turbo,
 							parsed.facelift,
 							parsed.transmission,
-							transmission_gears,
-							parsed.mileage_km,
 							resolvedModelName,
 							modelNameSlug,
-							parsed.manu_color_name,
-							parsed.gen_color_name,
-							parsed.gen_color_code,
 							parsed.raw_json,
 							output_100_str,
 							output_100_decimal,
@@ -447,7 +442,7 @@ async function applyModelOutput(db: D1Database, payload: unknown): Promise<strin
 				parsed.manu_color_name,
 				parsed.gen_color_name,
 				parsed.gen_color_code,
-				parsed.mileage_km,
+				mileage_km,
 				parsed.site,
 				parsed.id
 			)
