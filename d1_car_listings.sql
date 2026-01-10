@@ -515,6 +515,7 @@ CREATE TABLE IF NOT EXISTS ai_search_log (
   search_id TEXT,
   ip_addr TEXT,
   query_text TEXT,
+  remark TEXT,
   result_json TEXT,
   model_version TEXT,
   usage_prompt_tokens INTEGER,

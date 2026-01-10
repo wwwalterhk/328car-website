@@ -77,6 +77,22 @@ function extractOutputText(resp: unknown): string | null {
 	return joined || null;
 }
 
+function parseRemark(raw: string | null): string | null {
+	if (!raw) return null;
+	try {
+		const parsed = JSON.parse(raw) as { remark?: string | string[] };
+		if (Array.isArray(parsed.remark)) {
+			return parsed.remark.filter(Boolean).join("\n") || null;
+		}
+		if (typeof parsed.remark === "string") {
+			return parsed.remark || null;
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
 function randomId10(): string {
 	const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	const buf = randomBytes(10);
@@ -110,6 +126,7 @@ export async function POST(req: Request) {
 	const body = (await req.json().catch(() => null)) as { term?: string } | null;
 	const term = body?.term?.trim();
 	if (!term) return NextResponse.json({ ok: false, message: "Missing term" }, { status: 400 });
+	if (term.length > 40) return NextResponse.json({ ok: false, message: "Query too long (max 40 characters)" }, { status: 400 });
 	if (!apiKey) return NextResponse.json({ ok: false, message: "OPENAI_API_KEY not configured" }, { status: 500 });
 
 	const startedAt = Date.now();
@@ -123,6 +140,25 @@ export async function POST(req: Request) {
 	const searchId = await generateSearchId(db ?? null);
 		const rawIp = getClientIp(req);
 		const ipAddr = anonymizeIp(rawIp);
+	let parsedRemark: string | null = null;
+	console.log("ai_search client IP:", ipAddr);
+
+	// Simple per-IP rate limit: max 10/day
+	if (db && ipAddr) {
+		const todayCount = await db
+			.prepare("SELECT COUNT(1) as cnt FROM ai_search_log WHERE ip_addr = ? AND date(created_at) = date('now')")
+			.bind(ipAddr)
+			.first<{ cnt: number }>();
+		if ((todayCount?.cnt ?? 0) >= 10) {
+			return NextResponse.json(
+				{
+					ok: false,
+					message: "Beta功能：每日每個IP最多10次查詢。請明天再試。",
+				},
+				{ status: 429 }
+			);
+		}
+	}
 
 	// Resolve session user
 	const session = await getServerSession(authOptions);
@@ -184,8 +220,10 @@ Respond with this JSON structure only (no other text or commentary):
 	if (db) {
 		try {
 			const res = await db
-				.prepare(`INSERT INTO ai_search_log (query_text, search_id, model_version, user_pk, ip_addr, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`)
-				.bind(term, searchId, null, userPk, ipAddr)
+				.prepare(
+					`INSERT INTO ai_search_log (query_text, search_id, remark, model_version, user_pk, ip_addr, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+				)
+				.bind(term, searchId, parsedRemark, null, userPk, ipAddr)
 				.run();
 			logPk = res.meta?.last_row_id ?? null;
 		} catch (e) {
@@ -220,6 +258,10 @@ Respond with this JSON structure only (no other text or commentary):
 	}
 
 	const usedMs = Date.now() - startedAt;
+	const assistantText = extractAssistantText(rawResponse);
+	const outputTextOnly = extractOutputText(rawResponse) ?? assistantText;
+	parsedRemark = parseRemark(outputTextOnly);
+
 	// Log (update existing row; fallback insert if pre-insert failed)
 	if (db && (rawResponse || error)) {
 		const { costHkd, costUsd } = computeCostHKD(promptTokens, completionTokens);
@@ -228,11 +270,12 @@ Respond with this JSON structure only (no other text or commentary):
 				await db
 					.prepare(
 						`UPDATE ai_search_log
-             SET result_json = ?, model_version = ?, usage_prompt_tokens = ?, usage_completion_tokens = ?, cost_hkd = ?, cost_usd = ?, completed_at = datetime('now'), used_second = ?, user_pk = COALESCE(user_pk, ?), ip_addr = COALESCE(ip_addr, ?), search_id = COALESCE(search_id, ?)
+             SET result_json = ?, remark = COALESCE(?, remark), model_version = ?, usage_prompt_tokens = ?, usage_completion_tokens = ?, cost_hkd = ?, cost_usd = ?, completed_at = datetime('now'), used_second = ?, user_pk = COALESCE(user_pk, ?), ip_addr = COALESCE(ip_addr, ?), search_id = COALESCE(search_id, ?)
              WHERE ai_search_pk = ?`
 					)
 					.bind(
 						JSON.stringify(rawResponse || { error }),
+						parsedRemark,
 						modelVersion,
 						promptTokens || null,
 						completionTokens || null,
@@ -248,12 +291,13 @@ Respond with this JSON structure only (no other text or commentary):
 			} else {
 				await db
 					.prepare(
-						`INSERT INTO ai_search_log (query_text, search_id, result_json, model_version, user_pk, ip_addr, usage_prompt_tokens, usage_completion_tokens, cost_hkd, cost_usd, completed_at, used_second)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+						`INSERT INTO ai_search_log (query_text, search_id, remark, result_json, model_version, user_pk, ip_addr, usage_prompt_tokens, usage_completion_tokens, cost_hkd, cost_usd, completed_at, used_second)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
 					)
 					.bind(
 						term,
 						searchId,
+						parsedRemark,
 						JSON.stringify(rawResponse || { error }),
 						modelVersion,
 						userPk,
@@ -273,14 +317,13 @@ Respond with this JSON structure only (no other text or commentary):
 
 	if (error) return NextResponse.json({ ok: false, message: error }, { status: 500 });
 
-	const assistantText = extractAssistantText(rawResponse);
-	const outputTextOnly = extractOutputText(rawResponse) ?? assistantText;
 	return NextResponse.json({
 		ok: true,
 		search_id: searchId,
 		assistant_text: assistantText,
 		parsed_text: outputTextOnly,
 		raw_json: outputTextOnly,
+		remark: parsedRemark,
 		usage_prompt_tokens: promptTokens,
 		usage_completion_tokens: completionTokens,
 	});

@@ -264,13 +264,8 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
 		<main className="min-h-screen bg-[color:var(--bg-1)] text-[color:var(--txt-1)]">
 			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
 				<div className="mb-6 space-y-2">
-					<div className="text-xs uppercase tracking-[0.26em] text-[color:var(--txt-3)]">AI Search Result</div>
-					<h1 className="text-2xl font-semibold text-[color:var(--txt-1)] sm:text-3xl">搜尋編號 {searchId}</h1>
 					{remarkText ? <p className="text-sm text-[color:var(--txt-2)] whitespace-pre-line">{remarkText}</p> : null}
 					{log.query_text ? <p className="text-sm text-[color:var(--txt-3)]">查詢：{log.query_text}</p> : null}
-					<div className="text-xs text-[color:var(--txt-3)]">
-						Tokens: input {log.usage_prompt_tokens ?? 0} · output {log.usage_completion_tokens ?? 0} · model {log.model_version ?? "-"}
-					</div>
 					<div className="pt-2">
 						<Link
 							href="/hk/zh/ai_search"
