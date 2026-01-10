@@ -38,6 +38,7 @@ type ModelRow = {
 	brand: string | null;
 	brand_slug: string | null;
 	model_name: string | null;
+	model_name_slug: string | null;
 	detail_model_name: string | null;
 	body_type: string | null;
 	power: string | null;
@@ -46,6 +47,9 @@ type ModelRow = {
 	power_kw: number | null;
 	model_slug: string | null;
 	thumb: string | null;
+	year_min: number | null;
+	year_max: number | null;
+	price_min: number | null;
 };
 
 function extractOutputText(resp: RawResponse | null): string | null {
@@ -223,6 +227,7 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
       m.brand,
       m.brand_slug,
       m.model_name,
+      m.model_name_slug,
       m.detail_model_name,
       m.body_type,
       m.power,
@@ -230,6 +235,9 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
       m.engine_cc_100_int AS engine_cc,
       m.power_kw_100_int AS power_kw,
       m.model_slug,
+      (SELECT MIN(year) FROM car_listings cl WHERE cl.model_pk = m.model_pk AND cl.sts = 1) AS year_min,
+      (SELECT MAX(year) FROM car_listings cl WHERE cl.model_pk = m.model_pk AND cl.sts = 1) AS year_max,
+      (SELECT MIN(COALESCE(cl.discount_price, cl.price)) FROM car_listings cl WHERE cl.model_pk = m.model_pk AND cl.sts = 1) AS price_min,
       (
         SELECT url_r2 FROM car_listings_photo p
         WHERE p.listing_pk IN (
@@ -303,10 +311,15 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
 					<div className="grid gap-4 md:grid-cols-2">
 						{modelRows.map((l) => {
 							const thumb = normalizeCdn(l.thumb);
+							const href =
+								l.brand_slug && (l.model_slug && l.model_name_slug)
+									? `/hk/zh/${l.brand_slug}/${l.model_name_slug}/${l.model_slug}`
+									: "#";
 							return (
-								<article
+								<Link
 									key={l.model_pk}
-									className="flex gap-4 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 shadow-sm"
+									href={href}
+									className="flex gap-4 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--accent-1)]/40 hover:shadow-md"
 								>
 									<div className="relative h-20 w-28 overflow-hidden rounded-xl bg-[color:var(--cell-2)]">
 										{thumb ? (
@@ -319,13 +332,19 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
 										<div className="text-xs text-[color:var(--txt-2)] line-clamp-2">
 											{l.detail_model_name || l.body_type || ""}
 										</div>
+										<div className="text-xs font-semibold text-[color:var(--txt-2)]">
+											{l.price_min ? `起價 HKD $${formatMoneyHKD(l.price_min)}` : ""}
+										</div>
+										<div className="text-xs text-[color:var(--txt-3)]">
+											{l.year_min ? (l.year_max && l.year_max !== l.year_min ? `${l.year_min} - ${l.year_max}` : `${l.year_min}`) : ""}
+										</div>
 										<div className="text-xs text-[color:var(--txt-3)]">
 											{l.engine_cc ? `${l.engine_cc} cc · ` : ""}
 											{l.power_kw ? `${l.power_kw} kW · ` : ""}
 											{l.transmission ?? ""} {l.power ? `· ${l.power}` : ""}
 										</div>
 									</div>
-								</article>
+								</Link>
 							);
 						})}
 					</div>

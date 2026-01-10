@@ -15,6 +15,8 @@ export default function AiSearchLanding() {
 	const [tokens, setTokens] = useState<{ prompt: number; completion: number }>({ prompt: 0, completion: 0 });
 	const [stream, setStream] = useState<string[]>([]);
 	const [wsStatus, setWsStatus] = useState<string>("idle");
+	const [totalTime, setTotalTime] = useState<number>(60);
+	const [progress, setProgress] = useState<number>(0);
 	const wsRef = useRef<EventSource | null>(null);
 
 	const handleSubmit = (e: React.FormEvent) => {
@@ -22,6 +24,7 @@ export default function AiSearchLanding() {
 		const t = term.trim();
 		if (!t) return;
 		setLoading(true);
+		setProgress(0);
 		setError(null);
 		setAssistantText(null);
 		setRawJson(null);
@@ -53,6 +56,16 @@ export default function AiSearchLanding() {
 			console.error("ws open failed", err);
 			setWsStatus("error");
 		}
+
+		// Fetch latest total time reference
+		fetch("/api/ai_search/ws?meta=1")
+			.then((res) => res.json().catch(() => null) as Promise<{ total_seconds?: number } | null>)
+			.then((data) => {
+				if (data?.total_seconds && Number(data.total_seconds) > 0) {
+					setTotalTime(Number(data.total_seconds));
+				}
+			})
+			.catch(() => {});
 
 		fetch("/api/ai_search", {
 			method: "POST",
@@ -95,6 +108,7 @@ export default function AiSearchLanding() {
 				} catch {
 					/* noop */
 				}
+				setProgress(100);
 				setWsStatus((prev) => (prev === "open" ? "closed" : prev));
 			});
 	};
@@ -108,6 +122,23 @@ export default function AiSearchLanding() {
 			}
 		};
 	}, []);
+
+	// Progress animation while loading
+	useEffect(() => {
+		if (!loading) return;
+		const start = performance.now();
+		const duration = totalTime * 1000;
+		const tick = (now: number) => {
+			const elapsed = now - start;
+			const raw = Math.min(elapsed / duration, 1);
+			// ease-out
+			const eased = 1 - Math.pow(1 - raw, 3);
+			setProgress(Math.floor(eased * 100));
+			if (raw < 1 && loading) requestAnimationFrame(tick);
+		};
+		const id = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(id);
+	}, [loading, totalTime]);
 
 	return (
 		<main className="relative min-h-screen text-[color:var(--txt-1)]">
@@ -153,6 +184,21 @@ export default function AiSearchLanding() {
 								}`}
 							>
 								{!loading && remark ? remark : stream[stream.length - 1]}
+							</div>
+						</div>
+					) : null}
+
+					{loading ? (
+						<div className="mt-3">
+							<div className="mb-1 flex justify-between text-[11px] text-[color:var(--txt-3)]">
+								<span>背景處理</span>
+								<span>{progress}%</span>
+							</div>
+							<div className="h-2 overflow-hidden rounded-full bg-[color:var(--cell-2)]">
+								<div
+									className="h-full rounded-full bg-[color:var(--accent-1)]/70 transition-all"
+									style={{ width: `${Math.min(progress, 100)}%` }}
+								/>
 							</div>
 						</div>
 					) : null}

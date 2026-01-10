@@ -161,7 +161,7 @@ Respond with this JSON structure only (no other text or commentary):
 {
   "result_type": "precise" | "suggest", // "precise" if all fields are confidently from user input; "suggest" if any suggestions made
   "result": {
-    "brand": [""],
+    "brand": ["complete brand name, e.g. toyota, if mb etc, return mercedes benz, best effort"],
     "models": [
       { "brand": "e.g. bmw", "name": ["specific model, e.g. 320i, corolla, not 3 Series, max 6 for all"] }
     ],
