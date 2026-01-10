@@ -507,3 +507,23 @@ BEGIN
     NEW.price, NEW.discount_price, NEW.sold, NEW.brand_slug, NEW.model_pk, NEW.model_sts, NEW.model, NEW.last_update_datetime
   );
 END;
+
+-- AI search logs (per interactive query)
+CREATE TABLE IF NOT EXISTS ai_search_log (
+  ai_search_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_pk INTEGER,
+  search_id TEXT,
+  ip_addr TEXT,
+  query_text TEXT,
+  result_json TEXT,
+  model_version TEXT,
+  usage_prompt_tokens INTEGER,
+  usage_completion_tokens INTEGER,
+  cost_hkd REAL,
+  cost_usd REAL,
+  completed_at DATETIME,
+  used_second REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_search_log_search_id ON ai_search_log(search_id);
