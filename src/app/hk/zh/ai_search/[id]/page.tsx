@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 type RawResponse = {
 	output?: Array<{
@@ -179,29 +180,7 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
 	else if (minCc) filters.push({ clause: "m.engine_cc_100_int >= ?", value: [minCc] });
 	else if (maxCc) filters.push({ clause: "m.engine_cc_100_int <= ?", value: [maxCc] });
 
-	const transmissions = parsed?.result?.transmission_type?.filter(Boolean) ?? [];
-	// if (transmissions.length > 0) {
-	// 	filters.push({
-	// 		clause: `lower(m.transmission) IN (${transmissions.map(() => "?").join(",")})`,
-	// 		value: transmissions.map((t) => t.toLowerCase()),
-	// 	});
-	// }
-
-	const fuels = parsed?.result?.power_type?.filter(Boolean) ?? [];
-	// if (fuels.length > 0) {
-	// 	filters.push({
-	// 		clause: `lower(m.power) IN (${fuels.map(() => "?").join(",")})`,
-	// 		value: fuels.map((f) => f.toLowerCase()),
-	// 	});
-	// }
-
-	const bodies = parsed?.result?.body_type?.filter(Boolean) ?? [];
-	// if (bodies.length > 0) {
-	// 	filters.push({
-	// 		clause: `lower(m.body_type) IN (${bodies.map(() => "?").join(",")})`,
-	// 		value: bodies.map((b) => b.toLowerCase()),
-	// 	});
-	// }
+	// transmission, fuel, body filters intentionally skipped to keep results broad
 
 	const whereParts: string[] = [];
 	const bindValues: unknown[] = [];
@@ -211,7 +190,32 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
 		else if (f.value !== undefined) bindValues.push(f.value);
 	}
 
-	const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+	const carWhereParts: string[] = [];
+	const carBindValues: unknown[] = [];
+	if (yearStart && yearEnd) {
+		carWhereParts.push("cl.year BETWEEN ? AND ?");
+		carBindValues.push(yearStart, yearEnd);
+	} else if (yearStart) {
+		carWhereParts.push("cl.year >= ?");
+		carBindValues.push(yearStart);
+	} else if (yearEnd) {
+		carWhereParts.push("cl.year <= ?");
+		carBindValues.push(yearEnd);
+	}
+	if (minBudget && maxBudget) {
+		carWhereParts.push("COALESCE(cl.discount_price, cl.price) BETWEEN ? AND ?");
+		carBindValues.push(minBudget, maxBudget);
+	} else if (minBudget) {
+		carWhereParts.push("COALESCE(cl.discount_price, cl.price) >= ?");
+		carBindValues.push(minBudget);
+	} else if (maxBudget) {
+		carWhereParts.push("COALESCE(cl.discount_price, cl.price) <= ?");
+		carBindValues.push(maxBudget);
+	}
+	const whereCarSql = carWhereParts.length ? ` AND ${carWhereParts.join(" AND ")}` : "";
+
+	const modelClauses = [`EXISTS (SELECT 1 FROM car_listings cl WHERE cl.model_pk = m.model_pk AND cl.sts = 1 ${whereCarSql})`, ...whereParts];
+	const modelWhereSql = modelClauses.length ? `WHERE ${modelClauses.join(" AND ")}` : "";
 
 	const sql = `
     SELECT
@@ -232,6 +236,7 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
           SELECT listing_pk FROM car_listings cl
           WHERE cl.model_pk = m.model_pk
             AND cl.sts = 1
+            ${whereCarSql}
           ORDER BY COALESCE(cl.discount_price, cl.price) ASC, cl.year DESC
           LIMIT 1
         )
@@ -239,12 +244,12 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
         LIMIT 1
       ) AS thumb
     FROM models m
-    ${whereSql}
+    ${modelWhereSql}
     ORDER BY m.brand_slug, m.model_name_slug
     LIMIT 50
   `;
 
-	const modelsRes = await db.prepare(sql).bind(...bindValues).all<ModelRow>();
+	const modelsRes = await db.prepare(sql).bind(...[...carBindValues, ...carBindValues, ...bindValues]).all<ModelRow>();
 	const modelRows = modelsRes.results ?? [];
 
 	return (
@@ -259,12 +264,12 @@ export default async function AiSearchResultPage({ params }: { params: Promise<{
 						Tokens: input {log.usage_prompt_tokens ?? 0} · output {log.usage_completion_tokens ?? 0} · model {log.model_version ?? "-"}
 					</div>
 					<div className="pt-2">
-						<a
+						<Link
 							href="/hk/zh/ai_search"
 							className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--txt-2)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]"
 						>
 							開始新搜尋
-						</a>
+						</Link>
 					</div>
 				</div>
 

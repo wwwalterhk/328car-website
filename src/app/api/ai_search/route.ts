@@ -163,7 +163,7 @@ Respond with this JSON structure only (no other text or commentary):
   "result": {
     "brand": [""],
     "models": [
-      { "brand": "e.g. bmw", "name": ["specific model, e.g. 320i, corolla, not 3 Series"] }
+      { "brand": "e.g. bmw", "name": ["specific model, e.g. 320i, corolla, not 3 Series, max 6 for all"] }
     ],
     "color": [""],
     "manu_year": { "start": "integer", "end": "integer" },
