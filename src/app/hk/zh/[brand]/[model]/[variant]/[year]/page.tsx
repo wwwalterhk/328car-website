@@ -26,7 +26,6 @@ type CarRow = {
 };
 
 type OptionRow = { listing_pk: number; item: string | null; certainty: string | null };
-type RemarkRow = { listing_pk: number; item: string | null; remark: string | null };
 
 async function loadCars(
 	brandSlug: string,
@@ -71,7 +70,11 @@ async function loadCars(
         AND m.model_slug = ?
         AND m.model_name_slug = ?
         AND c.year = ?
-      ORDER BY c.price ASC`
+      ORDER BY
+        CASE
+          WHEN c.discount_price IS NOT NULL AND c.discount_price > 0 THEN c.discount_price
+          ELSE c.price
+        END ASC`
 		)
 		.bind(brandSlug, modelSlug, modelNameSlug, year)
 		.all<CarRow>();
@@ -148,10 +151,13 @@ function Chip({ children }: { children: React.ReactNode }) {
 
 type PageProps = {
 	params: Promise<{ brand: string; model: string; variant: string; year: string }>;
+	searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function ModelYearCarsPage({ params }: PageProps) {
-	const { brand, model, variant, year } = await params;
+export default async function ModelYearCarsPage({ params, searchParams }: PageProps) {
+	const resolvedParams = await params;
+	const resolvedSearch = searchParams ? await searchParams : undefined;
+	const { brand, model, variant, year } = resolvedParams;
 	const yearNumber = Number(year);
 
 	const cars = await loadCars(brand, model, variant, yearNumber);
@@ -160,7 +166,6 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 	const db = (env as CloudflareEnv & { DB?: D1Database }).DB;
 
 	const optionsMap = new Map<number, OptionRow[]>();
-	const remarksMap = new Map<number, RemarkRow[]>();
 
 	if (db && cars.length > 0) {
 		const listingIds = cars.map((c) => c.listing_pk);
@@ -180,27 +185,51 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 			arr.push(row);
 			optionsMap.set(row.listing_pk, arr);
 		});
-
-		const remarkResult = await db
-			.prepare(
-				`SELECT listing_pk, item, remark
-         FROM car_listing_remarks
-         WHERE listing_pk IN (${placeholders})`
-			)
-			.bind(...listingIds)
-			.all<RemarkRow>();
-
-		(remarkResult.results ?? []).forEach((row) => {
-			const arr = remarksMap.get(row.listing_pk) ?? [];
-			arr.push(row);
-			remarksMap.set(row.listing_pk, arr);
-		});
 	}
 
 	const brandTitle = cars[0]?.name_zh_hk || cars[0]?.name_en || brand;
 	const brandTitleEn = cars[0]?.name_en || titleFromSlug(brand);
 	const heading = cars[0]?.model_name || titleFromSlug(variant || model || "Model");
 	const subtitle = "Active listings for this variant and year (last 12 months).";
+
+	// Aggregate option counts for filter UI
+	const optionCounts = new Map<string, number>();
+	optionsMap.forEach((arr) => {
+		arr.forEach((opt) => {
+			const key = (opt.item || "").trim();
+			if (!key) return;
+			optionCounts.set(key, (optionCounts.get(key) ?? 0) + 1);
+		});
+	});
+	const optionFilters = Array.from(optionCounts.entries())
+		.filter(([, count]) => count >= 3)
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+	// Selected options from query
+	const rawOpt = resolvedSearch?.opt;
+	const selectedOptions = new Set<string>();
+	if (Array.isArray(rawOpt)) {
+		rawOpt.forEach((v) => {
+			if (typeof v === "string" && v.trim()) selectedOptions.add(v.trim().toLowerCase());
+		});
+	} else if (typeof rawOpt === "string" && rawOpt.trim()) {
+		// Support comma-delimited or single
+		rawOpt.split(",").forEach((v) => {
+			if (v.trim()) selectedOptions.add(v.trim().toLowerCase());
+		});
+	}
+
+	const filteredCars =
+		selectedOptions.size === 0
+			? cars
+			: cars.filter((car) => {
+					const opts = optionsMap.get(car.listing_pk) ?? [];
+					const set = new Set(opts.map((o) => (o.item || "").trim().toLowerCase()).filter(Boolean));
+					for (const sel of selectedOptions) {
+						if (!set.has(sel)) return false;
+					}
+					return true;
+			  });
 
 	const brandHref = `/hk/zh/${brand}`;
 	const modelHref = `/hk/zh/${brand}/${model}`;
@@ -259,20 +288,65 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 					</div>
 
 					<div className="flex flex-wrap gap-3">
-						<StatPill label="Listings" value={formatInt(cars.length)} />
+						<StatPill label="Listings" value={formatInt(filteredCars.length)} />
 						<StatPill label="Sorted By" value="Lowest Price" />
 					</div>
 
 					<div className="border-t border-[color:var(--surface-border)]" />
 				</header>
 
+				{/* Option filters */}
+				{optionFilters.length > 0 ? (
+					<section className="mt-6 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 sm:p-5">
+						<div className="flex items-center justify-between gap-3">
+							<div className="text-sm font-semibold text-[color:var(--txt-1)]">Filter by options</div>
+							{selectedOptions.size > 0 ? (
+								<Link
+									href="?"
+									className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-1)] transition hover:text-[color:var(--accent-1)]/80"
+								>
+									Clear
+								</Link>
+							) : null}
+						</div>
+						<div className="mt-3 flex flex-wrap gap-2">
+							{optionFilters.map(([label, count]) => {
+								const value = label.trim();
+								const lower = value.toLowerCase();
+								const checked = selectedOptions.has(lower);
+								const params = new URLSearchParams();
+								// Build new query string with toggled option
+								const baseOpts = Array.from(selectedOptions).filter((o) => o !== lower);
+								if (!checked) baseOpts.push(lower);
+								baseOpts.forEach((o) => params.append("opt", o));
+								const href = params.toString() ? `?${params.toString()}` : "?";
+								return (
+									<Link
+										key={label}
+										href={href}
+										className={[
+											"cursor-pointer select-none rounded-full border px-3 py-1.5 text-sm transition",
+											checked
+												? "border-[color:var(--accent-1)] bg-[color:var(--accent-3)]/40 text-[color:var(--txt-1)]"
+												: "border-[color:var(--surface-border)] bg-[color:var(--cell-1)] text-[color:var(--txt-2)] hover:bg-[color:var(--cell-2)]",
+										].join(" ")}
+									>
+										<span className="font-medium">{label}</span>{" "}
+										<span className="text-[11px] text-[color:var(--txt-3)]">({formatInt(count)})</span>
+									</Link>
+								);
+							})}
+						</div>
+					</section>
+				) : null}
+
 				{/* Content */}
 				<section className="mt-8">
-					{cars.length === 0 ? (
+					{filteredCars.length === 0 ? (
 						<div className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-6">
-							<div className="text-sm text-[color:var(--txt-2)]">
-								No listings found for this variant and year in the past year.
-							</div>
+						<div className="text-sm text-[color:var(--txt-2)]">
+							No listings found for this variant and year in the past year.
+						</div>
 							<div className="mt-6">
 								<Link
 									href={modelHref}
@@ -291,7 +365,7 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 						</div>
 					) : (
 						<div className="grid gap-4 lg:grid-cols-2">
-							{cars.map((car) => {
+							{filteredCars.map((car) => {
 								const href = normalizeListingHref(car.site, car.url);
 								const postId = car.id ?? car.url;
 								const sold = Boolean(car.sold);
@@ -301,7 +375,6 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 								const priceWas = hasDiscount ? formatHKD(car.price) : null;
 
 								const options = optionsMap.get(car.listing_pk) ?? [];
-								const remarks = remarksMap.get(car.listing_pk) ?? [];
 
 								const colorName = car.gen_color_name || car.manu_color_name || "N/A";
 								const colorHex = isHexColor(car.gen_color_code) ? car.gen_color_code!.trim() : null;
@@ -430,42 +503,6 @@ export default async function ModelYearCarsPage({ params }: PageProps) {
 																) : null}
 															</Chip>
 														))}
-													</div>
-												</details>
-											</div>
-										) : null}
-
-										{/* remarks */}
-										{remarks.length > 0 ? (
-											<div className="mt-4">
-												<details className="group">
-													<summary
-														className={[
-															"cursor-pointer list-none",
-															"flex items-center justify-between gap-3",
-															"rounded-2xl border border-[color:var(--surface-border)]",
-															"bg-[color:var(--cell-1)] px-4 py-3",
-															"transition hover:bg-[color:var(--cell-2)]",
-															"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
-														].join(" ")}
-													>
-														<div className="text-sm font-medium text-[color:var(--txt-1)]">
-															Notes{" "}
-															<span className="text-[color:var(--txt-3)]">({formatInt(remarks.length)})</span>
-														</div>
-														<span className="text-[color:var(--txt-3)] transition group-open:rotate-180" aria-hidden>
-															⌄
-														</span>
-													</summary>
-
-													<div className="mt-3 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] p-4">
-														<ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-[color:var(--txt-2)]">
-															{remarks.map((r, idx) => (
-																<li key={`${car.listing_pk}-remark-${idx}`} className="leading-relaxed">
-																	{r.remark ?? "—"}
-																</li>
-															))}
-														</ul>
 													</div>
 												</details>
 											</div>
