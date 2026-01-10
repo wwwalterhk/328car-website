@@ -1,9 +1,36 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { Metadata } from "next";
 import Link from "next/link";
 import AuthStatus from "@/app/components/auth-status";
 import BrandLogo from "@/app/components/brand-logo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+	title: "328car | 香港精選汽車買賣平台｜真實行情與車款導覽",
+	description: "在 328car 探索香港最新車款與真實行價。按品牌、車型、年份與動力類型快速篩選，查看實時在售車輛、價格區間與配備。",
+	alternates: { canonical: "https://328car.com/" },
+	openGraph: {
+		type: "website",
+		url: "https://328car.com/",
+		title: "328car | 香港精選汽車買賣平台｜真實行情與車款導覽",
+		description: "在 328car 探索香港最新車款與真實行價。按品牌、車型、年份與動力類型快速篩選，查看實時在售車輛、價格區間與配備。",
+		images: [
+			{
+				url: "https://cdn.328car.com/og/hero.jpg",
+				width: 1200,
+				height: 630,
+				alt: "328car Hong Kong car listings",
+			},
+		],
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: "328car | 香港精選汽車買賣平台｜真實行情與車款導覽",
+		description: "在 328car 探索香港最新車款與真實行價。按品牌、車型、年份與動力類型快速篩選，查看實時在售車輛、價格區間與配備。",
+		images: ["https://cdn.328car.com/og/hero.jpg"],
+	},
+};
 
 type BrandRow = {
 	slug: string;
@@ -317,6 +344,20 @@ function SoftButton({
 }
 
 export default async function Home() {
+	const searchJsonLd = {
+		"@context": "https://schema.org",
+		"@type": "WebSite",
+		name: "328car",
+		url: "https://328car.com/",
+		description:
+			"在 328car 探索香港最新車款與真實行價。按品牌、車型、年份與動力類型快速篩選，查看實時在售車輛、價格區間與配備。",
+		potentialAction: {
+			"@type": "SearchAction",
+			target: "https://328car.com/hk/zh/search/{search_term_string}",
+			"query-input": "required name=search_term_string",
+		},
+	};
+
 	const [electricModels, traditionalModels, classicModels, brands] = await Promise.all([
 		loadElectricModelsSummary(),
 		loadModelsSummary(),
@@ -339,6 +380,10 @@ export default async function Home() {
 			/>
 
 			<div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16">
+				<script
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{ __html: JSON.stringify(searchJsonLd) }}
+				/>
 				<div className="mb-6 flex items-center justify-end gap-3 text-xs sm:text-sm">
 					<Link
 						href="/hk/zh/sell"
@@ -361,7 +406,7 @@ export default async function Home() {
 					{/* Row 1: AI Search (full width) */}
 					<div className="">
 						<div className="space-y-4">
-							<SectionPill>Search</SectionPill>
+							<SectionPill>AI Search (beta)</SectionPill>
 
 							<div className="space-y-3">
 								<h1 className="font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">

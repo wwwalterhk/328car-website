@@ -59,7 +59,7 @@ export default async function SiteHeader() {
 								328car
 							</span>
 							<span className="hidden sm:inline text-sm font-medium text-[color:var(--txt-1)]">
-								Luxury Listings
+								Used Car Listings
 							</span>
 						</Link>
 
