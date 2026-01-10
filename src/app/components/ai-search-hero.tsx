@@ -352,7 +352,9 @@ export default function AiSearchHero() {
 				<span
 					className={[
 						"inline-flex h-2.5 w-2.5 items-center justify-center rounded-full",
-						wsStatus === "open" ? "animate-ping bg-emerald-400" : "bg-emerald-700",
+						wsStatus === "open"
+							? "animate-ping bg-emerald-400"
+							: "bg-emerald-700 animate-[pulse_3s_ease-in-out_infinite]",
 					].join(" ")}
 					aria-hidden
 				/>
