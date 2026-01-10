@@ -22,6 +22,7 @@ type ModelRow = {
 	model_name_slug: string | null;
 	min_year: number | null;
 	max_year: number | null;
+	min_price: number | null;
 };
 
 async function loadBrands(): Promise<BrandRow[]> {
@@ -51,7 +52,8 @@ async function loadModelsSummary(): Promise<ModelRow[]> {
         b.slug AS brand_slug,
         m.model_name_slug,
         MIN(c.year) AS min_year,
-        MAX(c.year) AS max_year
+        MAX(c.year) AS max_year,
+        MIN(CASE WHEN c.discount_price IS NOT NULL AND c.discount_price > 0 THEN c.discount_price ELSE c.price END) AS min_price
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -84,7 +86,8 @@ async function loadElectricModelsSummary(): Promise<ModelRow[]> {
         b.slug AS brand_slug,
         m.model_name_slug,
         MIN(c.year) AS min_year,
-        MAX(c.year) AS max_year
+        MAX(c.year) AS max_year,
+        MIN(CASE WHEN c.discount_price IS NOT NULL AND c.discount_price > 0 THEN c.discount_price ELSE c.price END) AS min_price
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -117,7 +120,8 @@ async function loadClassicModelsSummary(): Promise<ModelRow[]> {
         b.slug AS brand_slug,
         m.model_name_slug,
         MIN(c.year) AS min_year,
-        MAX(c.year) AS max_year
+        MAX(c.year) AS max_year,
+        MIN(CASE WHEN c.discount_price IS NOT NULL AND c.discount_price > 0 THEN c.discount_price ELSE c.price END) AS min_price
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
@@ -218,6 +222,7 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 	const modelNameSlug = model.model_name_slug || toSlug(model.model_name);
 	const href = `/hk/zh/${model.brand_slug}/${modelNameSlug || ""}`;
 	const years = yearRange(model.min_year, model.max_year);
+	const minPrice = model.min_price;
 
 	return (
 		<Link
@@ -263,7 +268,9 @@ function ModelTile({ model, tagLabel }: { model: ModelRow; tagLabel?: string }) 
 
 						<div className="mt-4 rounded-2xl border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-4 py-3">
 							<div className="text-[11px] tracking-[0.22em] uppercase text-[color:var(--txt-3)]">Start from</div>
-							<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">HKD $88,000</div>
+							<div className="mt-1 text-sm font-medium tabular-nums text-[color:var(--txt-1)]">
+								{minPrice != null ? `HKD $${minPrice.toLocaleString("en-US")}` : "—"}
+							</div>
 						</div>
 					</div>
 				</div>
@@ -344,7 +351,7 @@ export default async function Home() {
 					>
 						Sell your car
 					</Link>
-					<div className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-1.5">
+					<div className="">
 						<AuthStatus />
 					</div>
 				</div>
@@ -354,11 +361,11 @@ export default async function Home() {
 					{/* Row 1: AI Search (full width) */}
 					<div className="">
 						<div className="space-y-4">
-							<SectionPill>AI Search</SectionPill>
+							<SectionPill>Search</SectionPill>
 
 							<div className="space-y-3">
 								<h1 className="font-semibold tracking-tight text-[color:var(--txt-1)] sm:text-4xl">
-									Find the right car in one line.
+									Find the right car
 								</h1>
 								<p className="text-sm leading-relaxed text-[color:var(--txt-2)] sm:text-base">
 									Describe what you want — model, budget, year, body style — and explore active listings with market context.
@@ -371,9 +378,7 @@ export default async function Home() {
 								method="GET"
 								className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-3)] p-3 sm:p-4"
 							>
-								<div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-3)]">
-									Ask in natural language
-								</div>
+								
 
 								<div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-stretch">
 									<div className="flex-1">
@@ -417,53 +422,6 @@ export default async function Home() {
 						</div>
 					</div>
 
-					{/* Row 2: Member access + Placeholder feature */}
-					<div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-						{/* Member access (compact) */}
-						<aside className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5 sm:p-6">
-							<div className="space-y-4">
-								<div className="space-y-2">
-									<div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--txt-3)]">
-										Member access
-									</div>
-									<p className="text-sm leading-relaxed text-[color:var(--txt-2)]">
-										Sign in to save searches, track listings, and unlock deeper browsing.
-									</p>
-								</div>
-
-								<div className="grid gap-2">
-									<AuthStatus />
-								</div>
-
-							</div>
-						</aside>
-
-						{/* Placeholder feature (suggested function) */}
-						<aside className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-5 sm:p-6">
-							<div className="space-y-4">
-								<div className="space-y-2">
-									<div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--txt-3)]">
-										咖啡時間
-									</div>
-									<p className="text-sm leading-relaxed text-[color:var(--txt-2)]">
-										Short, thoughtful updates on cars, tech, and the market—edited for a quieter, faster read.
-									</p>
-								</div>
-
-							
-
-								<div className="flex flex-wrap gap-2">
-									<SoftButton href="#">Explore market brief</SoftButton>
-									<SoftButton href="#">Learn more</SoftButton>
-								</div>
-							</div>
-						</aside>
-					</div>
-
-					<div className="flex items-center gap-3 text-xs uppercase tracking-[0.26em] text-[color:var(--txt-3)]">
-						<span className="h-px w-10 bg-[color:var(--surface-border)]" aria-hidden />
-						Featured models (12m activity)
-					</div>
 				</section>
 
 

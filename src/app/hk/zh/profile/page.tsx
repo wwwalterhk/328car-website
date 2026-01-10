@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useRef } from "react";
 import NextImage from "next/image";
@@ -124,7 +124,16 @@ export default function ProfilePage() {
 			<div className="mx-auto max-w-4xl px-6 py-12 space-y-8">
 				<div>
 					<div className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--txt-3)]">Profile</div>
-					<h1 className="text-3xl font-semibold">Your account</h1>
+					<div className="flex flex-wrap items-center gap-3">
+						<h1 className="text-3xl font-semibold">Your account</h1>
+						<button
+							type="button"
+							onClick={() => void signOut()}
+							className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--txt-2)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]"
+						>
+							Log out
+						</button>
+					</div>
 					{profile?.user?.user_id ? (
 						<p className="mt-1 text-sm text-[color:var(--txt-3)]">Handle: @{profile.user.user_id}</p>
 					) : null}
