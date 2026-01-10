@@ -163,7 +163,7 @@ Respond with this JSON structure only (no other text or commentary):
   "result": {
     "brand": [""],
     "models": [
-      { "brand": "", "name": [""] }
+      { "brand": "e.g. bmw", "name": ["specific model, e.g. 320i, corolla, not 3 Series"] }
     ],
     "color": [""],
     "manu_year": { "start": "integer", "end": "integer" },
@@ -175,7 +175,7 @@ Respond with this JSON structure only (no other text or commentary):
     "body_type": ["general most simple body type, e.g., suv, sedan, hatchback, not too specific"],
     "transmission_type": ["A or M only"]
   },
-  "remark": "very short reason in Traditional Chinese; no price or warranty mention; clear and directly user-facing, never with wording such as 'ask user for...'"
+  "remark": "short reason in Traditional Chinese; no price or warranty mention; clear and directly user-facing, never with wording such as 'ask user for...'"
 }
 
 `;
@@ -277,6 +277,7 @@ Respond with this JSON structure only (no other text or commentary):
 	const outputTextOnly = extractOutputText(rawResponse) ?? assistantText;
 	return NextResponse.json({
 		ok: true,
+		search_id: searchId,
 		assistant_text: assistantText,
 		parsed_text: outputTextOnly,
 		raw_json: outputTextOnly,

@@ -30,7 +30,6 @@ export async function GET() {
 	const stream = new ReadableStream({
 		start(controller) {
 			const buckets = (prompts as PromptBuckets) || {};
-			let idx = 0;
 			const started = Date.now();
 
 			const send = () => {
@@ -42,8 +41,7 @@ export async function GET() {
 
 				if (list.length === 0) return;
 
-				const next = list[idx % list.length];
-				idx++;
+				const next = list[Math.floor(Math.random() * list.length)];
 				controller.enqueue(new TextEncoder().encode(`data: ${next}\n\n`));
 			};
 

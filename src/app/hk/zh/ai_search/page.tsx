@@ -10,6 +10,7 @@ export default function AiSearchLanding() {
 	const [assistantText, setAssistantText] = useState<string | null>(null);
 	const [rawJson, setRawJson] = useState<string | null>(null);
 	const [remark, setRemark] = useState<string | null>(null);
+	const [searchId, setSearchId] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [tokens, setTokens] = useState<{ prompt: number; completion: number }>({ prompt: 0, completion: 0 });
 	const [stream, setStream] = useState<string[]>([]);
@@ -25,6 +26,7 @@ export default function AiSearchLanding() {
 		setAssistantText(null);
 		setRawJson(null);
 		setRemark(null);
+		setSearchId(null);
 		setTokens({ prompt: 0, completion: 0 });
 		setStream([]);
 		setWsStatus("idle");
@@ -64,6 +66,7 @@ export default function AiSearchLanding() {
 							message?: string;
 							assistant_text?: string | null;
 							raw_json?: string | null;
+							search_id?: string | null;
 							remark?: string | null;
 							usage_prompt_tokens?: number;
 							usage_completion_tokens?: number;
@@ -75,6 +78,7 @@ export default function AiSearchLanding() {
 				setAssistantText(data?.assistant_text || null);
 				setRawJson(data?.raw_json || null);
 				setRemark(data?.remark || null);
+				setSearchId(data?.search_id || null);
 				setTokens({
 					prompt: data?.usage_prompt_tokens ?? 0,
 					completion: data?.usage_completion_tokens ?? 0,
@@ -182,6 +186,17 @@ export default function AiSearchLanding() {
 
 						{assistantText || rawJson ? (
 							<div className="text-xs text-[color:var(--txt-3)]">Tokens: input {tokens.prompt} · output {tokens.completion}</div>
+						) : null}
+
+						{!loading && searchId ? (
+							<div>
+								<a
+									href={`/hk/zh/ai_search/${searchId}`}
+									className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--txt-2)] transition hover:-translate-y-0.5 hover:bg-[color:var(--cell-2)]"
+								>
+									查看整理結果
+								</a>
+							</div>
 						) : null}
 					</div>
 				</div>
