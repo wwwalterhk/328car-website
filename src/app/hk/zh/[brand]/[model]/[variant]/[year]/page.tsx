@@ -191,6 +191,11 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 	const brandTitleEn = cars[0]?.name_en || titleFromSlug(brand);
 	const heading = cars[0]?.model_name || titleFromSlug(variant || model || "Model");
 	const subtitle = "Active listings for this variant and year (last 12 months).";
+	const effectivePrices = cars
+		.map((c) => (c.discount_price != null && c.discount_price > 0 ? c.discount_price : c.price))
+		.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+	const minPrice = effectivePrices.length ? Math.min(...effectivePrices) : null;
+	const maxPrice = effectivePrices.length ? Math.max(...effectivePrices) : null;
 
 	// Aggregate option counts for filter UI
 	const optionCounts = new Map<string, number>();
@@ -204,6 +209,25 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 	const optionFilters = Array.from(optionCounts.entries())
 		.filter(([, count]) => count >= 3)
 		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+	// Aggregate color counts
+	type ColorItem = { label: string; value: string; count: number; hex?: string | null };
+	const colorMap = new Map<string, ColorItem>();
+	cars.forEach((car) => {
+		const label = (car.gen_color_name || car.manu_color_name || "").trim();
+		const hex = isHexColor(car.gen_color_code) ? car.gen_color_code!.trim() : null;
+		if (!label && !hex) return;
+		const displayLabel = label || hex || "Color";
+		const value = displayLabel.toLowerCase();
+		const existing = colorMap.get(value);
+		if (existing) {
+			existing.count += 1;
+			if (!existing.hex && hex) existing.hex = hex;
+		} else {
+			colorMap.set(value, { label: displayLabel, value, count: 1, hex });
+		}
+	});
+	const colorFilters = Array.from(colorMap.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
 	// Selected options from query
 	const rawOpt = resolvedSearch?.opt;
@@ -219,14 +243,47 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 		});
 	}
 
+	// Selected colors from query
+	const rawColor = resolvedSearch?.color;
+	const selectedColors = new Set<string>();
+	if (Array.isArray(rawColor)) {
+		rawColor.forEach((v) => {
+			if (typeof v === "string" && v.trim()) selectedColors.add(v.trim().toLowerCase());
+		});
+	} else if (typeof rawColor === "string" && rawColor.trim()) {
+		rawColor.split(",").forEach((v) => {
+			if (v.trim()) selectedColors.add(v.trim().toLowerCase());
+		});
+	}
+
+	const buildHref = (type: "opt" | "color", value: string) => {
+		const nextOpts = new Set(selectedOptions);
+		const nextColors = new Set(selectedColors);
+		if (type === "opt") {
+			nextOpts.has(value) ? nextOpts.delete(value) : nextOpts.add(value);
+		} else {
+			nextColors.has(value) ? nextColors.delete(value) : nextColors.add(value);
+		}
+		const params = new URLSearchParams();
+		nextOpts.forEach((o) => params.append("opt", o));
+		nextColors.forEach((c) => params.append("color", c));
+		return params.toString() ? `?${params.toString()}` : "?";
+	};
+
 	const filteredCars =
-		selectedOptions.size === 0
+		selectedOptions.size === 0 && selectedColors.size === 0
 			? cars
 			: cars.filter((car) => {
-					const opts = optionsMap.get(car.listing_pk) ?? [];
-					const set = new Set(opts.map((o) => (o.item || "").trim().toLowerCase()).filter(Boolean));
-					for (const sel of selectedOptions) {
-						if (!set.has(sel)) return false;
+					if (selectedOptions.size > 0) {
+						const opts = optionsMap.get(car.listing_pk) ?? [];
+						const set = new Set(opts.map((o) => (o.item || "").trim().toLowerCase()).filter(Boolean));
+						for (const sel of selectedOptions) {
+							if (!set.has(sel)) return false;
+						}
+					}
+					if (selectedColors.size > 0) {
+						const colorLabel = (car.gen_color_name || car.manu_color_name || "").trim().toLowerCase();
+						if (!colorLabel || !selectedColors.has(colorLabel)) return false;
 					}
 					return true;
 			  });
@@ -285,6 +342,15 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 							{yearNumber || "Year"}
 						</h1>
 						<p className="max-w-3xl text-sm leading-relaxed text-[color:var(--txt-2)]">{subtitle}</p>
+						{minPrice != null || maxPrice != null ? (
+							<div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-[color:var(--txt-3)]">
+								<span>Price range</span>
+								<span className="font-semibold text-[color:var(--txt-1)]">
+									{minPrice != null ? formatHKD(minPrice) : "—"}
+									{maxPrice != null && maxPrice !== minPrice ? ` – ${formatHKD(maxPrice)}` : ""}
+								</span>
+							</div>
+						) : null}
 					</div>
 
 					<div className="flex flex-wrap gap-3">
@@ -314,12 +380,7 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 								const value = label.trim();
 								const lower = value.toLowerCase();
 								const checked = selectedOptions.has(lower);
-								const params = new URLSearchParams();
-								// Build new query string with toggled option
-								const baseOpts = Array.from(selectedOptions).filter((o) => o !== lower);
-								if (!checked) baseOpts.push(lower);
-								baseOpts.forEach((o) => params.append("opt", o));
-								const href = params.toString() ? `?${params.toString()}` : "?";
+								const href = buildHref("opt", lower);
 								return (
 									<Link
 										key={label}
@@ -333,6 +394,52 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 									>
 										<span className="font-medium">{label}</span>{" "}
 										<span className="text-[11px] text-[color:var(--txt-3)]">({formatInt(count)})</span>
+									</Link>
+								);
+							})}
+						</div>
+					</section>
+				) : null}
+
+				{colorFilters.length > 0 ? (
+					<section className="mt-4 rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] p-4 sm:p-5">
+						<div className="flex items-center justify-between gap-3">
+							<div className="text-sm font-semibold text-[color:var(--txt-1)]">Filter by color</div>
+							{selectedColors.size > 0 ? (
+								<Link
+									href="?"
+									className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--accent-1)] transition hover:text-[color:var(--accent-1)]/80"
+								>
+									Clear
+								</Link>
+							) : null}
+						</div>
+						<div className="mt-3 flex flex-wrap gap-2">
+							{colorFilters.map((c) => {
+								const checked = selectedColors.has(c.value);
+								const href = buildHref("color", c.value);
+								const swatch = c.hex && isHexColor(c.hex) ? c.hex : null;
+								return (
+									<Link
+										key={c.value}
+										href={href}
+										className={[
+											"cursor-pointer select-none rounded-full border px-3 py-1.5 text-sm transition gap-2",
+											checked
+												? "border-[color:var(--accent-1)] bg-[color:var(--accent-3)]/40 text-[color:var(--txt-1)]"
+												: "border-[color:var(--surface-border)] bg-[color:var(--cell-1)] text-[color:var(--txt-2)] hover:bg-[color:var(--cell-2)]",
+										].join(" ")}
+									>
+										{swatch ? (
+											<span
+												className="inline-block h-4 w-4 rounded-full border border-[color:var(--surface-border)] align-middle filter-color-swatch mr-1"
+												style={{ backgroundColor: swatch }}
+												aria-label={`Color ${swatch}`}
+												title={swatch}
+											/>
+										) : null}
+										<span className="font-medium">{c.label}</span>{" "}
+										<span className="text-[11px] text-[color:var(--txt-3)]">({formatInt(c.count)})</span>
 									</Link>
 								);
 							})}
@@ -378,6 +485,19 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 
 								const colorName = car.gen_color_name || car.manu_color_name || "N/A";
 								const colorHex = isHexColor(car.gen_color_code) ? car.gen_color_code!.trim() : null;
+								const colorBadge = colorHex ? (
+									<span
+										className="inline-flex items-center gap-2 rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-1 text-xs text-[color:var(--txt-2)]"
+										title={colorName}
+									>
+										<span
+											className="h-3 w-3 rounded-full border border-[color:var(--surface-border)]"
+											style={{ backgroundColor: colorHex }}
+											aria-label={`Color ${colorHex}`}
+										/>
+										<span className="truncate">{colorName}</span>
+									</span>
+								) : null;
 
 								return (
 									<article
@@ -455,7 +575,7 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 													<span className="truncate">{colorName}</span>
 													{colorHex ? (
 														<span
-															className="h-4 w-4 rounded-full border border-[color:var(--surface-border)]"
+															className="h-4 w-4 rounded-full border border-[color:var(--surface-border)] car-color-swatch"
 															style={{ backgroundColor: colorHex }}
 															aria-label={`Color ${colorHex}`}
 															title={colorHex}
@@ -493,6 +613,7 @@ export default async function ModelYearCarsPage({ params, searchParams }: PagePr
 													</summary>
 
 													<div className="mt-3 flex flex-wrap gap-2">
+														{colorBadge}
 														{options.map((opt, idx) => (
 															<Chip key={`${car.listing_pk}-opt-${idx}-${opt.item ?? "item"}`}>
 																{opt.item ?? "—"}
