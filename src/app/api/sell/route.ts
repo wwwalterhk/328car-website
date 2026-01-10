@@ -219,7 +219,7 @@ export async function POST(req: Request) {
 	if (listingPk) {
 		id = `S${String(listingPk).padStart(7, "0")}`;
 		const priceText = formatPriceTitle(body.price);
-		const newTitle = `${id} - ${brandZh} ${brandEn} ${model} ${manuYear} $${priceText}`.trim();
+		const newTitle = `${id} - ${brandEn} ${brandZh} ${model} ${manuYear} $${priceText}`.trim();
 		await db
 			.prepare("UPDATE car_listings SET id = ?, url = ?, title = ? WHERE listing_pk = ?")
 			.bind(id, `https://328car.com/sell/${id}`, newTitle, listingPk)

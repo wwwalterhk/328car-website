@@ -6,6 +6,16 @@ import type { PhotoRecord } from "./types";
 
 type DbBindings = CloudflareEnv & { DB?: D1Database; R2?: R2Bucket };
 
+function slugify(value: string | undefined | null): string | null {
+	if (!value) return null;
+	const slug = value
+		.toLowerCase()
+		.trim()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/(^-|-$)/g, "");
+	return slug || null;
+}
+
 function formatPriceTitle(price?: number | null): string {
 	if (price === null || price === undefined || !Number.isFinite(price)) return "";
 	if (price >= 10000) {
@@ -131,9 +141,18 @@ export async function PUT(req: Request, context: any) {
 		body.power_kw = null;
 	}
 
+	const existingBrandSlug = (existing as { brand_slug?: string | null }).brand_slug ?? null;
+	const brandSlug = slugify(body.brand ?? existingBrandSlug);
+	const brandRow = brandSlug
+		? await db.prepare("SELECT name_en, name_zh_hk FROM brands WHERE slug = ? LIMIT 1").bind(brandSlug).first<{ name_en: string | null; name_zh_hk: string | null }>()
+		: null;
+	const brandEn = brandRow?.name_en || body.brand || "";
+	const brandZh = brandRow?.name_zh_hk || body.brand || "";
+	const model = body.model || "";
+
 	const now = new Date().toISOString();
 	const priceText = formatPriceTitle(body.price);
-	const title = `${params.id} - ${body.brand ?? ""} ${body.model ?? ""} ${body.year ?? ""} HKD$${priceText}`.trim();
+	const title = `${params.id} - ${brandEn} ${brandZh} ${model} ${body.year ?? ""} $${priceText}`.trim();
 
 	await db
 		.prepare(
