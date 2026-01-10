@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import AuthStatus from "@/app/components/auth-status";
 import BrandLogo from "@/app/components/brand-logo";
+import AiSearchHero from "@/app/components/ai-search-hero";
 
 export const dynamic = "force-dynamic";
 
@@ -417,48 +418,7 @@ export default async function Home() {
 								</p>
 							</div>
 
-							{/* Option A: wider input, trailing button */}
-							<form
-								action="#"
-								method="GET"
-								className="rounded-3xl border border-[color:var(--surface-border)] bg-[color:var(--cell-3)] p-3 sm:p-4"
-							>
-								
-
-								<div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-stretch">
-									<div className="flex-1">
-										<input
-											name="q"
-											type="text"
-											placeholder='e.g. “Porsche 911 under HK$900k, 2018+, PDK”'
-											className={[
-												"w-full h-12 sm:h-11",
-												"rounded-2xl border border-[color:var(--surface-border)]",
-												"bg-[color:var(--cell-1)] px-4",
-												"text-sm text-[color:var(--txt-1)] outline-none",
-												"transition",
-												"focus:border-[color:var(--accent-1)] focus:ring-2 focus:ring-[color:var(--accent-1)]/25",
-											].join(" ")}
-										/>
-										<div className="mt-2 text-xs text-[color:var(--txt-3)]">
-											Try budget, year range, body style, or a specific trim.
-										</div>
-									</div>
-
-									<button
-										type="submit"
-										className={[
-											"shrink-0 h-12 sm:h-11",
-											"rounded-2xl bg-[color:var(--accent-1)] px-6",
-											"text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--on-accent-1)]",
-											"transition hover:opacity-90",
-											"focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35",
-										].join(" ")}
-									>
-										Search <span aria-hidden>→</span>
-									</button>
-								</div>
-							</form>
+							<AiSearchHero />
 
 							<div className="flex flex-wrap gap-2">
 								<SoftButton href="#brands">Browse brands</SoftButton>

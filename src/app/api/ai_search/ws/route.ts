@@ -7,7 +7,7 @@ type PromptBuckets = {
 	end?: string[];
 };
 
-export async function GET() {
+export async function GET(req: Request) {
 	let totalSeconds = 60;
 	try {
 		const { env } = await getCloudflareContext({ async: true });
@@ -22,6 +22,13 @@ export async function GET() {
 		}
 	} catch (e) {
 		console.error("ai_search_ws: failed to load last used_second", e);
+	}
+
+	const url = new URL(req.url);
+	if (url.searchParams.get("meta") === "1") {
+		return new Response(JSON.stringify({ total_seconds: totalSeconds }), {
+			headers: { "Content-Type": "application/json" },
+		});
 	}
 
 	const stage1 = totalSeconds / 3;
