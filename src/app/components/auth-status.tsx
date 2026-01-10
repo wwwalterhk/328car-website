@@ -26,7 +26,7 @@ export default function AuthStatus() {
 			<div className="">
 					<Link
 						href="/auth/signin"
-						className="inline-flex w-full items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-1)] transition hover:bg-[color:var(--cell-2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35"
+						className="inline-flex w-full items-center justify-center rounded-full border border-[color:var(--surface-border)] bg-[color:var(--cell-1)] px-3 py-2 font-semibold uppercase tracking-[0.22em] text-[color:var(--txt-1)] transition hover:bg-[color:var(--cell-2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-1)]/35"
 					>
 						Sign-in
 					</Link>
