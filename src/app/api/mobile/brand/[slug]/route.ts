@@ -19,6 +19,7 @@ type ModelRow = {
 	group_subheading: string | null;
 	group_summary: string | null;
 	group_slug: string | null;
+	model_desc: string | null;
 };
 
 export async function GET(_: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -133,10 +134,14 @@ async function loadBrandModels(db: D1Database, brand: string): Promise<ModelRow[
         g.heading AS group_heading,
         g.subheading AS group_subheading,
         g.summary AS group_summary,
-        g.group_slug
+        g.group_slug,
+        COALESCE(mi_zh.content, mi_en.content) AS model_desc
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
+      LEFT JOIN model_names mn ON mn.brand_slug = b.slug AND mn.model_name_slug = m.model_name_slug
+      LEFT JOIN model_names_item mi_zh ON mi_zh.model_name_pk = mn.model_name_pk AND mi_zh.locale = 'zh-HK' AND mi_zh.item = 'desc'
+      LEFT JOIN model_names_item mi_en ON mi_en.model_name_pk = mn.model_name_pk AND mi_en.locale = 'en' AND mi_en.item = 'desc'
       LEFT JOIN model_groups g ON m.model_groups_pk = g.model_groups_pk
       WHERE
         c.sts = 1
@@ -144,7 +149,7 @@ async function loadBrandModels(db: D1Database, brand: string): Promise<ModelRow[
         AND m.manu_model_code IS NOT NULL
         AND c.last_update_datetime > datetime('now', '-1 year')
         AND b.slug = ?
-      GROUP BY m.model_name_slug
+      GROUP BY m.model_name_slug, mi_zh.content, mi_en.content
       ORDER BY min_year DESC, m.model_name, m.power`
 		)
 		.bind(brand)
