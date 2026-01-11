@@ -169,15 +169,25 @@ CREATE TABLE IF NOT EXISTS models_item (
   UNIQUE (model_pk, locale, item)
 );
 
--- CREATE TABLE IF NOT EXISTS model_names (
---   model_name_pk INTEGER PRIMARY KEY AUTOINCREMENT,
---   brand_slug TEXT NOT NULL,
---   model_name_slug TEXT NOT NULL,
---   model_name TEXT NOT NULL,
---   model_sts INTEGER NOT NULL DEFAULT 0,
---   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
---   UNIQUE (model_name_slug, brand_slug)
--- );
+CREATE TABLE IF NOT EXISTS model_names (
+  model_name_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_slug TEXT NOT NULL,
+  model_name_slug TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_model_names_model_key_1 ON model_names(brand_slug, model_name_slug);
+
+CREATE TABLE IF NOT EXISTS model_names_item (
+  model_names_item_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+  model_name_pk INTEGER NOT NULL,
+  locale TEXT NOT NULL,
+  item TEXT,
+  item_key TEXT,
+  content TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS model_names_item_key_1 ON model_names_item(model_name_pk, locale, item);
 
 CREATE TABLE IF NOT EXISTS model_groups (
   model_groups_pk INTEGER PRIMARY KEY AUTOINCREMENT,
