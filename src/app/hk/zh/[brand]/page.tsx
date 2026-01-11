@@ -26,6 +26,7 @@ type ModelRow = {
 	group_slug: string | null;
 	power: string | null;
 	start_price: number | null;
+	model_desc: string | null;
 };
 
 function formatInt(n: number) {
@@ -132,10 +133,14 @@ async function loadBrandModels(brandSlug: string): Promise<ModelRow[]> {
         g.heading AS group_heading,
         g.subheading AS group_subheading,
         g.summary AS group_summary,
-        g.group_slug
+        g.group_slug,
+        COALESCE(mi_zh.content, mi_en.content) AS model_desc
       FROM car_listings c
       INNER JOIN models m ON c.model_pk = m.model_pk
       INNER JOIN brands b ON m.brand_slug = b.slug
+      LEFT JOIN model_names mn ON mn.brand_slug = b.slug AND mn.model_name_slug = m.model_name_slug
+      LEFT JOIN model_names_item mi_zh ON mi_zh.model_name_pk = mn.model_name_pk AND mi_zh.locale = 'zh-HK' AND mi_zh.item = 'desc'
+      LEFT JOIN model_names_item mi_en ON mi_en.model_name_pk = mn.model_name_pk AND mi_en.locale = 'en' AND mi_en.item = 'desc'
       LEFT JOIN model_groups g ON m.model_groups_pk = g.model_groups_pk
       WHERE
         c.sts = 1
@@ -173,6 +178,7 @@ function ModelCard({ model }: { model: ModelRow }) {
 	const years = yearRange(model.min_year, model.max_year);
 	const href = `/hk/zh/${model.brand_slug}/${model.model_name_slug || ""}`;
 	const startPrice = formatPrice(model.start_price);
+	const desc = model.model_desc;
 
 	return (
 		<Link
@@ -190,14 +196,18 @@ function ModelCard({ model }: { model: ModelRow }) {
 
 				<div className="text-lg font-semibold tracking-tight text-[color:var(--txt-1)]">{name}</div>
 
-				<div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--txt-2)]">
-					<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5">
-						{model.power || "—"}
-					</span>
-					<span className="text-[color:var(--txt-3)]">·</span>
-					<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5">
-						{model.manu_model_code || "—"}
-					</span>
+				<div className="text-sm leading-relaxed text-[color:var(--txt-2)] middle-content">
+					{desc || (
+						<span className="inline-flex flex-wrap items-center gap-2 text-xs">
+							<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5">
+								{model.power || "—"}
+							</span>
+							<span className="text-[color:var(--txt-3)]">·</span>
+							<span className="rounded-full border border-[color:var(--surface-border)] bg-[color:var(--bg-2)] px-2 py-0.5">
+								{model.manu_model_code || "—"}
+							</span>
+						</span>
+					)}
 				</div>
 
 				{/* Quiet-luxury price placeholder */}
