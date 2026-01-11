@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
 }
 
 function buildRequest(row: Row, model: string) {
-	const prompt = `1 to 2 sentences (strictly length limit within 200 chars) very short intro the car model to buyer in good perspective, 
+	const prompt = `1 to 2 sentences (strictly length limit within 240 chars) short intro the car model to buyer in good perspective, 
 	content and meaning of english and chinese doesn't need to be the same. don't mention maintenance, 
 	don't mention the model name in sentence again to save length,
 	i'll have the name above the description.must precisely for the specific model variant, 
@@ -188,7 +188,7 @@ function buildRequest(row: Row, model: string) {
 Tone: premium, modern, controlled, visual; avoid slogans and exaggeration.
 
 return json format:
-{"zh_hk":"tradition chinese desc", "en":"english desc strictly length limit within 200 chars)"}
+{"zh_hk":"tradition chinese desc", "en":"english desc strictly length limit within 240 chars)"}
 
 car model:
 ${row.brand_slug} ${row.model_name_slug}`;
