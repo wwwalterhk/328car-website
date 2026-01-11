@@ -345,6 +345,57 @@ export default function ModelMergeAdminPage() {
 						>
 							Send test email
 						</button>
+						<button
+							type="button"
+							disabled={!selectedBrand || apiLoading}
+							onClick={async () => {
+								if (!selectedBrand) return;
+								setConsoleTitle("Model name desc batch (update)");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								try {
+									const res = await fetch(
+										`/api/model-names/content?action=update&brand=${encodeURIComponent(selectedBrand)}&limit=5`,
+										{ cache: "no-store" }
+									);
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Model-name batch submitted" : "Batch submit failed");
+								} catch (error) {
+									setMessage(`Batch submit error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className={`inline-flex items-center justify-center rounded-full border border-[color:var(--accent-2)] bg-white px-3 py-1 text-[12px] font-semibold text-[color:var(--accent-2)] shadow-sm transition ${
+								!selectedBrand ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-0.5 hover:bg-[color:var(--accent-2)]/20 hover:shadow-sm"
+							}`}
+						>
+							Model names: update ({selectedBrand || "pick brand"},5)
+						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								setConsoleTitle("Model name desc batch (check)");
+								setConsoleOpen(true);
+								setApiLoading(true);
+								setApiResult(null);
+								try {
+									const res = await fetch("/api/model-names/content?action=check", { cache: "no-store" });
+									const data = await res.json();
+									setApiResult(JSON.stringify(data, null, 2));
+									setMessage(res.ok ? "Checked batches" : "Check failed");
+								} catch (error) {
+									setMessage(`Check error: ${error}`);
+								} finally {
+									setApiLoading(false);
+								}
+							}}
+							className="inline-flex items-center justify-center rounded-full border border-[color:var(--accent-2)] bg-white px-3 py-1 text-[12px] font-semibold text-[color:var(--accent-2)] shadow-sm transition hover:-translate-y-0.5 hover:bg-[color:var(--accent-2)]/20 hover:shadow-sm"
+						>
+							Model names: check
+						</button>
 						{unprocessedCount != null || processingCount != null || failedCount != null ? (
 							<span className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[color:var(--accent-3)] px-3 py-1 text-xs font-semibold text-[color:var(--accent-1)] ring-1 ring-[color:var(--accent-1)]/30">
 								<span className="h-2 w-2 rounded-full bg-[color:var(--accent-1)]" aria-hidden />

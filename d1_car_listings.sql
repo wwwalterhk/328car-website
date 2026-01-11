@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS model_names (
   model_name_pk INTEGER PRIMARY KEY AUTOINCREMENT,
   brand_slug TEXT NOT NULL,
   model_name_slug TEXT NOT NULL,
+  processing INTEGER NOT NULL DEFAULT 0, -- 0 is not, 1 is processing
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
